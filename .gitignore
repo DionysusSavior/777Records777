@@ -7,3 +7,5 @@ dist/
 build/
 coverage/
 *.log
+.medusa/
+storefront/public/admin/

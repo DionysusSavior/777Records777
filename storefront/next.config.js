@@ -53,6 +53,16 @@ const nextConfig = {
         : []),
     ],
   },
+  async rewrites() {
+    return {
+      afterFiles: [
+        {
+          source: "/admin/:path*",
+          destination: "/admin/index.html",
+        },
+      ],
+    }
+  },
 }
 
 module.exports = nextConfig

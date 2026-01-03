@@ -7,7 +7,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const backendUrl = env.MEDUSA_BACKEND_URL || "http://localhost:9000";
   const storefrontUrl = env.MEDUSA_STOREFRONT_URL || "http://localhost:8000";
-  const basePath = env.MEDUSA_ADMIN_BASE || "/";
+  const basePathRaw = env.MEDUSA_ADMIN_BASE || "/";
+  const basePath = basePathRaw.endsWith("/")
+    ? basePathRaw
+    : `${basePathRaw}/`;
 
   return {
     base: basePath,

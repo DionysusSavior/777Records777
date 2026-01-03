@@ -17,5 +17,13 @@ Medusa v2 monorepo with backend + Next.js storefront + self-hosted admin.
 7. Run admin: `npm run dev:admin`
 
 ## Admin UI
-- Default admin URL: `http://localhost:5173`
-- Ensure `ADMIN_CORS` in `backend/.env` includes `http://localhost:5173`
+- Dev admin URL: `http://localhost:5173`
+- Production admin URL (embedded): `https://<storefront-domain>/admin`
+- Ensure `ADMIN_CORS` in `backend/.env` includes the admin origin
+
+## Amplify
+The root `amplify.yml` builds the admin and embeds it under `storefront/public/admin`
+before building the Next.js storefront. Set these Amplify env vars:
+- `AMPLIFY_MONOREPO_APP_ROOT=storefront`
+- `MEDUSA_BACKEND_URL=https://<your-backend-domain>`
+- `MEDUSA_STOREFRONT_URL=https://<storefront-domain>`
