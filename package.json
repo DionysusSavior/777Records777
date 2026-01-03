@@ -1,26 +1,19 @@
 {
   "name": "777records777",
-  "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "backend",
+    "storefront",
+    "admin"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:storefront": "npm --workspace storefront run dev",
+    "dev:admin": "npm --workspace admin run dev",
+    "build:backend": "npm --workspace backend run build",
+    "build:storefront": "npm --workspace storefront run build",
+    "build:admin": "npm --workspace admin run build",
+    "preview:admin": "npm --workspace admin run preview",
+    "lint:storefront": "npm --workspace storefront run lint"
   }
 }
