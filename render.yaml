@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: medusa-backend
+    env: node
+    rootDir: .
+    plan: starter
+    buildCommand: |
+      npm install
+      npm run build:backend
+    startCommand: npm --workspace backend run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: COOKIE_SECRET
+        sync: false
+      - key: STORE_CORS
+        value: https://777records777.studio
+      - key: ADMIN_CORS
+        value: https://777records777.studio/admin,http://localhost:9000/app
+      - key: MEDUSA_BACKEND_URL
+        sync: false

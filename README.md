@@ -27,3 +27,21 @@ before building the Next.js storefront. Set these Amplify env vars:
 - `AMPLIFY_MONOREPO_APP_ROOT=storefront`
 - `MEDUSA_BACKEND_URL=https://<your-backend-domain>`
 - `MEDUSA_STOREFRONT_URL=https://<storefront-domain>`
+- `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=<publishable-key-from-Medusa-Admin>`
+- `NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://<your-backend-domain>`
+- `NEXT_PUBLIC_BASE_URL=https://<storefront-domain>`
+
+## Render deployment (backend)
+- In Render, create managed Postgres (grab `DATABASE_URL`) and managed Redis (grab `REDIS_URL`).
+- Add a new Web Service from this repo and let it pick up `render.yaml`.
+  - Build: `npm install && npm run build:backend`
+  - Start: `npm --workspace backend run start`
+  - Health check: `/health`
+- Set env vars on the service:
+  - `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `COOKIE_SECRET` (mark secrets as private)
+  - `STORE_CORS=https://777records777.studio`
+  - `ADMIN_CORS=https://777records777.studio/admin,http://localhost:9000/app`
+  - `MEDUSA_BACKEND_URL=https://<your-render-service>.onrender.com`
+- After first deploy, seed data once from the Render shell:
+  - `npm run seed --workspace backend`
+- In Medusa Admin → Settings → API Keys, create a **Publishable** key and paste it into Amplify as `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` so the storefront build succeeds.
