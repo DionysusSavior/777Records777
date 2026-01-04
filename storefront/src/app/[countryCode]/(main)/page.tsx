@@ -5,6 +5,9 @@ import Hero from "@modules/home/components/hero"
 import { listCollections } from "@lib/data/collections"
 import { getRegion } from "@lib/data/regions"
 
+// Debug backend URL during build/runtime
+console.log("MEDUSA", process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL)
+
 export const metadata: Metadata = {
   title: "Medusa Next.js Starter Template",
   description:
