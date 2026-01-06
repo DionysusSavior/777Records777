@@ -125,58 +125,46 @@ async function getCountryCode(
  * Middleware to handle region selection and onboarding status.
  */
 export async function middleware(request: NextRequest) {
-  let redirectUrl = request.nextUrl.href
-
-  let response = NextResponse.redirect(redirectUrl, 307)
-
-  let cacheIdCookie = request.cookies.get("_medusa_cache_id")
-
-  let cacheId = cacheIdCookie?.value || crypto.randomUUID()
-
-  const regionMap = await getRegionMap(cacheId)
-
-  const countryCode = regionMap && (await getCountryCode(request, regionMap))
-
-  const urlHasCountryCode =
-    countryCode && request.nextUrl.pathname.split("/")[1].includes(countryCode)
-
-  // if one of the country codes is in the url and the cache id is set, return next
-  if (urlHasCountryCode && cacheIdCookie) {
-    return NextResponse.next()
-  }
-
-  // if one of the country codes is in the url and the cache id is not set, set the cache id and redirect
-  if (urlHasCountryCode && !cacheIdCookie) {
-    response.cookies.set("_medusa_cache_id", cacheId, {
-      maxAge: 60 * 60 * 24,
-    })
-
-    return response
-  }
-
-  // check if the url is a static asset
+  // Short-circuit static assets to avoid unnecessary work
   if (request.nextUrl.pathname.includes(".")) {
     return NextResponse.next()
   }
 
-  const redirectPath =
-    request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+  const cacheIdCookie = request.cookies.get("_medusa_cache_id")
+  const cacheId = cacheIdCookie?.value || crypto.randomUUID()
 
-  const queryString = request.nextUrl.search ? request.nextUrl.search : ""
+  const regionMap = await getRegionMap(cacheId)
+  const countryCode = regionMap && (await getCountryCode(request, regionMap))
+  const urlHasCountryCode =
+    countryCode && request.nextUrl.pathname.split("/")[1].includes(countryCode)
 
-  // If no country code is set, we redirect to the relevant region.
-  if (!urlHasCountryCode && countryCode) {
-    redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
-    response = NextResponse.redirect(`${redirectUrl}`, 307)
-  } else if (!urlHasCountryCode && !countryCode) {
-    // Handle case where no valid country code exists (empty regions)
-    return new NextResponse(
-      "No valid regions configured. Please set up regions with countries in your Medusa Admin.",
-      { status: 500 }
-    )
+  // URL already has a country code
+  if (urlHasCountryCode) {
+    if (cacheIdCookie) {
+      return NextResponse.next()
+    }
+
+    const res = NextResponse.redirect(request.nextUrl.href, 307)
+    res.cookies.set("_medusa_cache_id", cacheId, {
+      maxAge: 60 * 60 * 24,
+    })
+    return res
   }
 
-  return response
+  const redirectPath =
+    request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+  const queryString = request.nextUrl.search ? request.nextUrl.search : ""
+
+  // No country code in URL: redirect or error
+  if (countryCode) {
+    const redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
+    return NextResponse.redirect(redirectUrl, 307)
+  }
+
+  return new NextResponse(
+    "No valid regions configured. Please set up regions with countries in your Medusa Admin.",
+    { status: 500 }
+  )
 }
 
 export const config = {
