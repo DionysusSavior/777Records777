@@ -1,10 +1,15 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.MEDUSA_BACKEND_URL
-const PUBLISHABLE_API_KEY =
+const backendUrl =
+  process.env.MEDUSA_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+
+const publishableKey =
+  process.env.MEDUSA_PUBLISHABLE_KEY ||
+  process.env.MEDUSA_PUBLISHABLE_API_KEY ||
   process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
-  process.env.MEDUSA_PUBLISHABLE_KEY
+  process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_API_KEY
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
 const regionMapCache = {
@@ -15,15 +20,15 @@ const regionMapCache = {
 async function getRegionMap(cacheId: string) {
   const { regionMap, regionMapUpdated } = regionMapCache
 
-  if (!BACKEND_URL) {
+  if (!backendUrl) {
     throw new Error(
       "Middleware.ts: Error fetching regions. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
     )
   }
 
-  if (!PUBLISHABLE_API_KEY) {
+  if (!publishableKey) {
     throw new Error(
-      "Middleware.ts: Missing publishable API key. Set NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY (or MEDUSA_PUBLISHABLE_KEY) in your environment."
+      "Middleware.ts: Missing publishable API key. Set NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY (or MEDUSA_PUBLISHABLE_KEY / MEDUSA_PUBLISHABLE_API_KEY) in your environment."
     )
   }
 
@@ -32,24 +37,32 @@ async function getRegionMap(cacheId: string) {
     regionMapUpdated < Date.now() - 3600 * 1000
   ) {
     // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
-    const { regions } = await fetch(`${BACKEND_URL}/store/regions`, {
-      headers: {
-        "x-publishable-api-key": PUBLISHABLE_API_KEY!,
-      },
+    const res = await fetch(`${backendUrl}/store/regions`, {
+      headers: publishableKey
+        ? { "x-publishable-api-key": publishableKey }
+        : {},
       next: {
         revalidate: 3600,
         tags: [`regions-${cacheId}`],
       },
       cache: "force-cache",
-    }).then(async (response) => {
-      const json = await response.json()
-
-      if (!response.ok) {
-        throw new Error(json.message)
-      }
-
-      return json
     })
+
+    console.log("MEDUSA", backendUrl)
+    console.log(
+      "HAS_PUBLISHABLE_KEY",
+      !!publishableKey,
+      "LEN",
+      publishableKey?.length
+    )
+
+    console.log("REGIONS_STATUS", res.status)
+    if (!res.ok) {
+      console.log("REGIONS_BODY", await res.text())
+      throw new Error("Error fetching regions")
+    }
+
+    const { regions } = await res.json()
 
     if (!regions?.length) {
       throw new Error(
