@@ -5,17 +5,16 @@ applications:
       phases:
         preBuild:
           commands:
-            - npm ci --prefix ..
-            - npm --prefix .. -w storefront ci
+            - npm install
         build:
           commands:
-            - npm --prefix .. -w storefront run build
+            - npm run build
       artifacts:
         baseDirectory: .next
         files:
           - "**/*"
       cache:
         paths:
-          - ../node_modules/**/*
           - node_modules/**/*
           - .next/cache/**/*
+
