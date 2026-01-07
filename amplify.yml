@@ -1,20 +1,21 @@
 version: 1
 applications:
-  - appRoot: .
+  - appRoot: storefront
     frontend:
       phases:
         preBuild:
           commands:
-            - npm ci
+            - npm ci --prefix ..
+            - npm --prefix .. -w storefront ci
         build:
           commands:
-            - npm run build
+            - npm --prefix .. -w storefront run build
       artifacts:
         baseDirectory: .next
         files:
           - "**/*"
       cache:
         paths:
+          - ../node_modules/**/*
           - node_modules/**/*
-          - storefront/node_modules/**/*
-          - storefront/.next/cache/**/*
+          - .next/cache/**/*
