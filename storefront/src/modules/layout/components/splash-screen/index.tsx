@@ -29,7 +29,7 @@ export default function SplashScreen({ children }: SplashScreenProps) {
           }`}
         >
           <span className="text-3xl tracking-[0.35em] uppercase">
-            777Records777 Studio
+            777Records777
           </span>
         </div>
       )}

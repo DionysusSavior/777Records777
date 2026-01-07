@@ -17,8 +17,8 @@ const Hero = () => {
   ]
 
   return (
-    <div className="relative min-h-[calc(100vh-96px)] w-full overflow-hidden border-b border-ui-border-base bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white">
-      <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top_left,_#ffffff20,_transparent_35%)]" />
+    <div className="relative min-h-[calc(100vh-96px)] w-full overflow-hidden border-b border-ui-border-base bg-black text-white">
+      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_#ffffff10,_transparent_45%)]" />
 
       <div className="relative z-10 flex min-h-[calc(100vh-96px)] flex-col items-center justify-center gap-16 px-6 pb-16 pt-8 text-center">
         <div className="grid w-full max-w-6xl gap-6 md:grid-cols-3">

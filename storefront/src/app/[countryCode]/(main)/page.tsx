@@ -9,9 +9,9 @@ import { getRegion } from "@lib/data/regions"
 console.log("MEDUSA", process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL)
 
 export const metadata: Metadata = {
-  title: "Medusa Next.js Starter Template",
+  title: "777Records777 Studio",
   description:
-    "A performant frontend ecommerce starter template with Next.js 15 and Medusa.",
+    "Sound, style, and stories from 777Records777 Studio.",
 }
 
 export default async function Home(props: {
