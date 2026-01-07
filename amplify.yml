@@ -1,24 +1,20 @@
 version: 1
 applications:
-  - appRoot: storefront
-    frontend:
+  - frontend:
       phases:
         preBuild:
           commands:
-            - npm install --prefix ..
-            - MEDUSA_ADMIN_BASE=/admin/ npm --prefix .. --workspace admin run build
-            - rm -rf public/admin
-            - mkdir -p public/admin
-            - cp -R ../admin/dist/. public/admin/
+            - npm ci
+            - npm -w storefront ci
         build:
           commands:
-            - npm run build
+            - npm -w storefront run build
       artifacts:
-        baseDirectory: .next
+        baseDirectory: storefront/.next
         files:
           - "**/*"
       cache:
         paths:
-          - ../node_modules/**/*
           - node_modules/**/*
-          - ../admin/node_modules/**/*
+          - storefront/node_modules/**/*
+          - storefront/.next/cache/**/*
