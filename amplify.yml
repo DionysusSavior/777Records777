@@ -6,12 +6,11 @@ applications:
         preBuild:
           commands:
             - npm ci
-            - npm -w storefront ci
         build:
           commands:
-            - npm -w storefront run build
+            - npm run build
       artifacts:
-        baseDirectory: storefront/.next
+        baseDirectory: .next
         files:
           - "**/*"
       cache:
