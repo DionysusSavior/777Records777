@@ -1,19 +1,21 @@
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - cd storefront
-        - npm ci
-    build:
-      commands:
-        - npm run build
-  artifacts:
-    baseDirectory: storefront/.next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - storefront/node_modules/**/*
-      - storefront/.next/cache/**/*
-
+applications:
+  - appRoot: .
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+            - npm -w storefront ci
+        build:
+          commands:
+            - npm -w storefront run build
+      artifacts:
+        baseDirectory: storefront/.next
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
+          - storefront/node_modules/**/*
+          - storefront/.next/cache/**/*
