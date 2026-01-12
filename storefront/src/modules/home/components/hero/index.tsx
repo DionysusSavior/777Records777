@@ -4,7 +4,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 const Hero = () => {
   const panels = [
     {
-      title: "Clothes",
+      title: "Uniforms",
       description: "Editorial drops, collaborations, and limited runs.",
       href: "/store",
     },

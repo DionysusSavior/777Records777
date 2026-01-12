@@ -4,8 +4,8 @@ import { SortOptions } from "@modules/store/components/refinement-list/sort-prod
 import StoreTemplate from "@modules/store/templates"
 
 export const metadata: Metadata = {
-  title: "Clothes",
-  description: "Explore all of our clothes.",
+  title: "Uniforms",
+  description: "Explore all of our uniforms.",
 }
 
 type Params = {
@@ -28,7 +28,7 @@ export default async function StorePage(props: Params) {
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
-      pageTitle="Clothes"
+      pageTitle="Uniforms"
     />
   )
 }
