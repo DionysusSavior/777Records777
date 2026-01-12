@@ -18,7 +18,7 @@ export const metadata: Metadata = {
       "Sound, style, and stories from 777Records777 Studio.",
     images: [
       {
-        url: "/opengraph-image.jpg",
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
         alt: "777Records777 Studio",
