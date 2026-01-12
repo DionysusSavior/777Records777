@@ -18,7 +18,8 @@ export const metadata: Metadata = {
       "Sound, style, and stories from 777Records777 Studio.",
     images: [
       {
-        url: "/opengraph-image.png",
+        // Use absolute URL so link previews don't break if NEXT_PUBLIC_BASE_URL is missing
+        url: "https://777records777.studio/opengraph-image.png",
         width: 1200,
         height: 630,
         alt: "777Records777 Studio",
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
     title: "777Records777 Studio",
     description:
       "Sound, style, and stories from 777Records777 Studio.",
-    images: ["/twitter-image.jpg"],
+    images: ["https://777records777.studio/twitter-image.jpg"],
   },
 }
 
