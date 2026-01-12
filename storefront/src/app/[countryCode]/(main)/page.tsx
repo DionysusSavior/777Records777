@@ -12,6 +12,26 @@ export const metadata: Metadata = {
   title: "777Records777 Studio",
   description:
     "Sound, style, and stories from 777Records777 Studio.",
+  openGraph: {
+    title: "777Records777 Studio",
+    description:
+      "Sound, style, and stories from 777Records777 Studio.",
+    images: [
+      {
+        url: "/opengraph-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "777Records777 Studio",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "777Records777 Studio",
+    description:
+      "Sound, style, and stories from 777Records777 Studio.",
+    images: ["/twitter-image.jpg"],
+  },
 }
 
 export default async function Home(props: {
