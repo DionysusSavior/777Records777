@@ -6,6 +6,20 @@ type ImageGalleryProps = {
   images: HttpTypes.StoreProductImage[]
 }
 
+const isVideoUrl = (url?: string) => {
+  if (!url) {
+    return false
+  }
+
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    return /\.(mp4|mov|webm|ogg)$/.test(pathname)
+  } catch {
+    const pathname = url.split("?")[0].toLowerCase()
+    return /\.(mp4|mov|webm|ogg)$/.test(pathname)
+  }
+}
+
 const ImageGallery = ({ images }: ImageGalleryProps) => {
   return (
     <div className="flex items-start relative">
@@ -17,19 +31,31 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
               className="relative aspect-[29/34] w-full overflow-hidden bg-ui-bg-subtle"
               id={image.id}
             >
-              {!!image.url && (
-                <Image
-                  src={image.url}
-                  priority={index <= 2 ? true : false}
-                  className="absolute inset-0 rounded-rounded"
-                  alt={`Product image ${index + 1}`}
-                  fill
-                  sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"
-                  style={{
-                    objectFit: "cover",
-                  }}
-                />
-              )}
+              {!!image.url &&
+                (isVideoUrl(image.url) ? (
+                  <video
+                    src={image.url}
+                    className="absolute inset-0 h-full w-full rounded-rounded object-cover"
+                    loop
+                    autoPlay
+                    muted
+                    playsInline
+                    controls
+                    aria-label={`Product video ${index + 1}`}
+                  />
+                ) : (
+                  <Image
+                    src={image.url}
+                    priority={index <= 2 ? true : false}
+                    className="absolute inset-0 rounded-rounded"
+                    alt={`Product image ${index + 1}`}
+                    fill
+                    sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"
+                    style={{
+                      objectFit: "cover",
+                    }}
+                  />
+                ))}
             </Container>
           )
         })}
