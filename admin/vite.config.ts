@@ -15,11 +15,15 @@ export default defineConfig(({ mode }) => {
   return {
     base: basePath,
     plugins: [
-      react(),
       medusaVitePlugin({
         sources: [path.resolve(__dirname, "../backend/src/admin")]
-      })
+      }),
+      react()
     ],
+    optimizeDeps: {
+      // Skip pre-bundling the dashboard so Vite plugins can resolve Medusa virtual modules.
+      exclude: ["@medusajs/dashboard"]
+    },
     define: {
       __BASE__: JSON.stringify(basePath),
       __BACKEND_URL__: JSON.stringify(backendUrl),

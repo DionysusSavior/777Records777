@@ -20,6 +20,15 @@ const isVideoUrl = (url?: string) => {
   }
 }
 
+const getVideoType = (url: string) => {
+  const lower = url.split("?")[0].toLowerCase()
+  if (lower.endsWith(".mp4")) return "video/mp4"
+  if (lower.endsWith(".mov")) return "video/quicktime"
+  if (lower.endsWith(".webm")) return "video/webm"
+  if (lower.endsWith(".ogg") || lower.endsWith(".ogv")) return "video/ogg"
+  return undefined
+}
+
 const ImageGallery = ({ images }: ImageGalleryProps) => {
   return (
     <div className="flex items-start relative">
@@ -40,9 +49,12 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
                     autoPlay
                     muted
                     playsInline
+                    preload="metadata"
                     controls
                     aria-label={`Product video ${index + 1}`}
-                  />
+                  >
+                    <source src={image.url} type={getVideoType(image.url)} />
+                  </video>
                 ) : (
                   <Image
                     src={image.url}

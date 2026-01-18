@@ -22,7 +22,11 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
   className,
   "data-testid": dataTestid,
 }) => {
-  const initialImage = thumbnail || images?.[0]?.url
+  const mediaCandidates = [
+    thumbnail,
+    ...(images?.map((i) => i?.url).filter(Boolean) ?? []),
+  ].filter(Boolean) as string[]
+  const mediaUrl = mediaCandidates[0]
 
   return (
     <Container
@@ -41,26 +45,54 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
       )}
       data-testid={dataTestid}
     >
-      <ImageOrPlaceholder image={initialImage} size={size} />
+      <MediaOrPlaceholder mediaUrl={mediaUrl} size={size} />
     </Container>
   )
 }
 
-const ImageOrPlaceholder = ({
-  image,
+const isVideoUrl = (url?: string) => {
+  if (!url) {
+    return false
+  }
+
+  const path = url.split("?")[0].toLowerCase()
+  return /\.(mp4|mov|webm|ogg)$/.test(path)
+}
+
+const MediaOrPlaceholder = ({
+  mediaUrl,
   size,
-}: Pick<ThumbnailProps, "size"> & { image?: string }) => {
-  return image ? (
-    <Image
-      src={image}
-      alt="Thumbnail"
-      className="absolute inset-0 object-cover object-center"
-      draggable={false}
-      quality={50}
-      sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"
-      fill
-    />
-  ) : (
+}: Pick<ThumbnailProps, "size"> & { mediaUrl?: string }) => {
+  if (mediaUrl && isVideoUrl(mediaUrl)) {
+    return (
+      <video
+        src={mediaUrl}
+        className="absolute inset-0 h-full w-full object-cover object-center rounded-medium"
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        controls={false}
+        aria-label="Product video preview"
+      />
+    )
+  }
+
+  if (mediaUrl) {
+    return (
+      <Image
+        src={mediaUrl}
+        alt="Thumbnail"
+        className="absolute inset-0 object-cover object-center"
+        draggable={false}
+        quality={50}
+        sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"
+        fill
+      />
+    )
+  }
+
+  return (
     <div className="w-full h-full absolute inset-0 flex items-center justify-center">
       <PlaceholderImage size={size === "small" ? 16 : 24} />
     </div>
