@@ -23,11 +23,18 @@ export default async function StorePage(props: Params) {
   const searchParams = await props.searchParams;
   const { sortBy, page } = searchParams
 
+  const uniformsProductIds = [
+    "prod_01KECR7W439TW1VQBTP0QGY4EF", // White BAMN tee
+    "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
+  ]
+
+  // Default store page currently shows everything; adjust productsIds to filter if needed.
   return (
     <StoreTemplate
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
+      productsIds={uniformsProductIds}
       pageTitle="Uniforms"
     />
   )

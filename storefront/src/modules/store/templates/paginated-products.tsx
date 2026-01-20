@@ -42,6 +42,14 @@ export default async function PaginatedProducts({
   }
 
   if (productsIds) {
+    if (productsIds.length === 0) {
+      return (
+        <ul
+          className="grid grid-cols-2 w-full small:grid-cols-3 medium:grid-cols-4 gap-x-6 gap-y-8"
+          data-testid="products-list"
+        />
+      )
+    }
     queryParams["id"] = productsIds
   }
 

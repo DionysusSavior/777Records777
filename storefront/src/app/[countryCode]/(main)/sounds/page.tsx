@@ -28,6 +28,7 @@ export default async function SoundsPage(props: Params) {
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
+      productsIds={[]}
       pageTitle="Sounds"
     />
   )

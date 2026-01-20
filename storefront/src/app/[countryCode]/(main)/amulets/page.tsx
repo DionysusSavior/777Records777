@@ -28,6 +28,7 @@ export default async function AmuletsPage(props: Params) {
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
+      productsIds={[]}
       pageTitle="Amulets"
     />
   )
