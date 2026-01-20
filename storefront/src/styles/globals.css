@@ -2,6 +2,24 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@layer base {
+  :root {
+    --bg-page: #05060a;
+    --panel: rgba(12, 14, 24, 0.7);
+    --border: rgba(255, 255, 255, 0.08);
+    --glow: 0 0 20px rgba(120, 240, 255, 0.25);
+  }
+
+  body {
+    background: radial-gradient(circle at 20% 20%, rgba(120, 120, 255, 0.08), transparent 35%),
+      radial-gradient(circle at 80% 0%, rgba(120, 240, 255, 0.08), transparent 30%),
+      radial-gradient(circle at 50% 80%, rgba(255, 120, 200, 0.06), transparent 30%),
+      var(--bg-page);
+    color: #e7ecff;
+    min-height: 100vh;
+  }
+}
+
 @layer utilities {
   /* Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
@@ -50,6 +68,21 @@
 }
 
 @layer components {
+  .holo-text {
+    background: linear-gradient(120deg, #f8fbff, #c6e6ff, #e5d4ff, #f8fbff);
+    background-size: 200% 200%;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: var(--glow);
+  }
+
   .content-container {
     @apply max-w-[1440px] w-full mx-auto px-6;
   }

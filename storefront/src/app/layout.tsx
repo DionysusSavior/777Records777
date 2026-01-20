@@ -28,8 +28,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout(props: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-mode="light">
-      <body>
+    <html lang="en" data-mode="dark" className="dark">
+      <body className="bg-slate-950 text-slate-100">
         <main className="relative">
           <SplashScreen>{props.children}</SplashScreen>
         </main>
