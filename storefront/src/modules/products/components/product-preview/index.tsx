@@ -15,6 +15,16 @@ export default async function ProductPreview({
   isFeatured?: boolean
   region: HttpTypes.StoreRegion
 }) {
+  if (!product?.handle) {
+    return null
+  }
+
+  const isVideo = (url?: string | null) =>
+    !!url && /\.(mp4|mov|webm|ogg)$/i.test((url.split("?")[0] as string) || "")
+
+  const nonVideoImages =
+    product.images?.filter((img) => !isVideo(img.url)) ?? product.images ?? []
+
   // const pricedProduct = await listProducts({
   //   regionId: region.id,
   //   queryParams: { id: [product.id!] },
@@ -33,7 +43,7 @@ export default async function ProductPreview({
       <div data-testid="product-wrapper">
         <Thumbnail
           thumbnail={product.thumbnail}
-          images={product.images}
+          images={nonVideoImages}
           size="full"
           isFeatured={isFeatured}
         />
