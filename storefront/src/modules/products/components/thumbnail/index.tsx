@@ -72,6 +72,7 @@ const MediaOrPlaceholder = ({
         loop
         playsInline
         preload="metadata"
+        autoPlay
         controls={false}
         aria-label="Product video preview"
       />
