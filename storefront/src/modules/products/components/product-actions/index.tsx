@@ -92,39 +92,31 @@ export default function ProductActions({
     router.replace(pathname + "?" + params.toString())
   }, [selectedVariant, isValidVariant])
 
-  // check if the selected variant is in stock
-  const inStock = useMemo(() => {
-    // If we don't manage inventory, we can always add to cart
-    if (selectedVariant && !selectedVariant.manage_inventory) {
-      return true
-    }
+  // ===== Product Action State Machine =====
+  const needsSelection = !selectedVariant || !isValidVariant
 
-    // If we allow back orders on the variant, we can add to cart
-    if (selectedVariant?.allow_backorder) {
-      return true
-    }
+  const isPreorder =
+    !!selectedVariant &&
+    (selectedVariant.allow_backorder === true ||
+      selectedVariant.manage_inventory === false)
 
-    // If there is inventory available, we can add to cart
-    if (
-      selectedVariant?.manage_inventory &&
-      (selectedVariant?.inventory_quantity || 0) > 0
-    ) {
-      return true
-    }
+  const isInStock =
+    !!selectedVariant &&
+    (selectedVariant.manage_inventory === false ||
+      (selectedVariant.inventory_quantity ?? 0) > 0)
 
-    // Otherwise, we can't add to cart
-    return false
-  }, [selectedVariant])
+  const isSoldOut = !!selectedVariant && !isPreorder && !isInStock
 
-  const isPreorder = useMemo(() => {
-    if (!selectedVariant) {
-      return false
-    }
-    return (
-      selectedVariant.allow_backorder === true ||
-      selectedVariant.manage_inventory === false
-    )
-  }, [selectedVariant])
+  const actionLabel = needsSelection
+    ? "Select variant"
+    : isPreorder
+    ? "Preorder"
+    : isInStock
+    ? "Add to cart"
+    : "Out of stock"
+
+  const actionDisabled =
+    needsSelection || isAdding || !!disabled || isSoldOut
 
   const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -174,25 +166,13 @@ export default function ProductActions({
 
         <Button
           onClick={handleAddToCart}
-          disabled={
-            !inStock ||
-            !selectedVariant ||
-            !!disabled ||
-            isAdding ||
-            !isValidVariant
-          }
+          disabled={actionDisabled}
           variant="primary"
           className="w-full h-10"
           isLoading={isAdding}
           data-testid="add-product-button"
         >
-          {!selectedVariant && !options
-            ? "Select variant"
-            : !inStock || !isValidVariant
-            ? "Out of stock"
-            : isPreorder
-            ? "Preorder"
-            : "Add to cart"}
+          {actionLabel}
         </Button>
         <MobileActions
           product={product}
