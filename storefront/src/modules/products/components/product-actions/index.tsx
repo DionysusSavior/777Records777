@@ -50,14 +50,23 @@ export default function ProductActions({
 
   const selectedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
-      return
+      return undefined
     }
 
+    // 🔑 SINGLE VARIANT, NO OPTIONS → AUTO SELECT
+    if (
+      product.variants.length === 1 &&
+      (product.options?.length ?? 0) === 0
+    ) {
+      return product.variants[0]
+    }
+
+    // Normal multi-option matching
     return product.variants.find((v) => {
       const variantOptions = optionsAsKeymap(v.options)
       return isEqual(variantOptions, options)
     })
-  }, [product.variants, options])
+  }, [product.variants, product.options, options])
 
   // update the options when a variant is selected
   const setOptionValue = (optionId: string, value: string) => {
@@ -69,11 +78,18 @@ export default function ProductActions({
 
   //check if the selected options produce a valid variant
   const isValidVariant = useMemo(() => {
+    if (
+      product.variants?.length === 1 &&
+      (product.options?.length ?? 0) === 0
+    ) {
+      return true
+    }
+
     return product.variants?.some((v) => {
       const variantOptions = optionsAsKeymap(v.options)
       return isEqual(variantOptions, options)
     })
-  }, [product.variants, options])
+  }, [product.variants, product.options, options])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
