@@ -24,6 +24,14 @@ export default async function ProductPreview({
 
   const nonVideoImages =
     product.images?.filter((img) => !isVideo(img.url)) ?? product.images ?? []
+  const videos = product.images?.filter((img) => isVideo(img.url)) ?? []
+  const preferredImages =
+    nonVideoImages.length > 0 ? nonVideoImages : videos
+
+  const isPreorder =
+    product.variants?.some(
+      (v) => v.allow_backorder === true || v.manage_inventory === false
+    ) ?? false
 
   // const pricedProduct = await listProducts({
   //   regionId: region.id,
@@ -43,7 +51,7 @@ export default async function ProductPreview({
       <div data-testid="product-wrapper">
         <Thumbnail
           thumbnail={product.thumbnail}
-          images={nonVideoImages}
+          images={preferredImages}
           size="full"
           isFeatured={isFeatured}
         />
@@ -52,6 +60,11 @@ export default async function ProductPreview({
             {product.title}
           </Text>
           <div className="flex items-center gap-x-2">
+            {isPreorder && (
+              <span className="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-white">
+                Preorder
+              </span>
+            )}
             {cheapestPrice && <PreviewPrice price={cheapestPrice} />}
           </div>
         </div>

@@ -116,6 +116,16 @@ export default function ProductActions({
     return false
   }, [selectedVariant])
 
+  const isPreorder = useMemo(() => {
+    if (!selectedVariant) {
+      return false
+    }
+    return (
+      selectedVariant.allow_backorder === true ||
+      selectedVariant.manage_inventory === false
+    )
+  }, [selectedVariant])
+
   const actionsRef = useRef<HTMLDivElement>(null)
 
   const inView = useIntersection(actionsRef, "0px")
@@ -180,6 +190,8 @@ export default function ProductActions({
             ? "Select variant"
             : !inStock || !isValidVariant
             ? "Out of stock"
+            : isPreorder
+            ? "Preorder"
             : "Add to cart"}
         </Button>
         <MobileActions
