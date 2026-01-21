@@ -40,13 +40,24 @@ export default function ProductActions({
   const [isAdding, setIsAdding] = useState(false)
   const countryCode = useParams().countryCode as string
 
-  // If there is only 1 variant, preselect the options
+  // Auto-select any option that only has a single possible value
   useEffect(() => {
-    if (product.variants?.length === 1) {
-      const variantOptions = optionsAsKeymap(product.variants[0].options)
-      setOptions(variantOptions ?? {})
+    const auto: Record<string, string> = {}
+
+    for (const opt of product.options ?? []) {
+      const values = opt.values ?? []
+      if (values.length === 1) {
+        auto[opt.id] = values[0].value
+      }
     }
-  }, [product.variants])
+
+    if (Object.keys(auto).length > 0) {
+      setOptions((prev) => {
+        const next = { ...auto, ...prev } // do not overwrite existing user selections
+        return isEqual(next, prev) ? prev : next
+      })
+    }
+  }, [product.options])
 
   const selectedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
