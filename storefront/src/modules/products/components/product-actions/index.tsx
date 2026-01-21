@@ -179,7 +179,7 @@ export default function ProductActions({
           variant={selectedVariant}
           options={options}
           updateOptions={setOptionValue}
-          inStock={inStock}
+          inStock={isInStock}
           handleAddToCart={handleAddToCart}
           isAdding={isAdding}
           show={!inView}
