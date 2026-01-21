@@ -40,25 +40,18 @@ export default function ProductActions({
   const [isAdding, setIsAdding] = useState(false)
   const countryCode = useParams().countryCode as string
 
-  // Auto-select options when there is only 1 possible value (e.g. "Default option")
   useEffect(() => {
-    const next: Record<string, string> = {}
+    // If there is exactly 1 variant, auto-select THAT variant's options (using option_id keys)
+    if (product.variants?.length === 1) {
+      const v = product.variants[0]
+      const variantOptions = optionsAsKeymap(v.options)
+      if (!variantOptions) return
 
-    for (const opt of product.options ?? []) {
-      const values = opt.values ?? []
-      if (values.length === 1) {
-        next[opt.id] = values[0].value
-      }
+      setOptions((prev) =>
+        isEqual(prev, variantOptions) ? prev : variantOptions
+      )
     }
-
-    if (Object.keys(next).length === 0) return
-
-    setOptions((prev) => {
-      // preserve any user-chosen options, but fill defaults
-      const merged = { ...next, ...prev }
-      return isEqual(merged, prev) ? prev : merged
-    })
-  }, [product.options])
+  }, [product.variants])
 
   const selectedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
