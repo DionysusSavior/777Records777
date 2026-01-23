@@ -304,6 +304,7 @@ export default function ProductActions({
           updateOptions={setOptionValue}
           isSellable={isSellable}
           isPreorder={isPreorder}
+          availabilityReady={availabilityReady}
           handleAddToCart={handleAddToCart}
           isAdding={isAdding}
           show={!inView}
