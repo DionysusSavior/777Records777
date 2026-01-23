@@ -61,11 +61,9 @@ export default function ProductActions({
       return undefined
     }
 
-    // 🔑 SINGLE VARIANT, NO OPTIONS → AUTO SELECT
-    if (
-      product.variants.length === 1 &&
-      (product.options?.length ?? 0) === 0
-    ) {
+    // Hard fallback: if there is only one variant, always select it.
+    // This prevents "Select variant" deadlocks when Medusa keeps a Default option.
+    if (product.variants.length === 1) {
       return product.variants[0]
     }
 
@@ -74,7 +72,7 @@ export default function ProductActions({
       const variantOptions = optionsAsKeymap(v.options)
       return isEqual(variantOptions, options)
     })
-  }, [product.variants, product.options, options])
+  }, [product.variants, options])
 
   // update the options when a variant is selected
   const setOptionValue = (optionId: string, value: string) => {
@@ -86,10 +84,12 @@ export default function ProductActions({
 
   //check if the selected options produce a valid variant
   const isValidVariant = useMemo(() => {
-    if (
-      product.variants?.length === 1 &&
-      (product.options?.length ?? 0) === 0
-    ) {
+    if (!product.variants || product.variants.length === 0) {
+      return false
+    }
+
+    // If only one variant exists, options selection should not be required.
+    if (product.variants.length === 1) {
       return true
     }
 
@@ -97,7 +97,7 @@ export default function ProductActions({
       const variantOptions = optionsAsKeymap(v.options)
       return isEqual(variantOptions, options)
     })
-  }, [product.variants, product.options, options])
+  }, [product.variants, options])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())

@@ -118,7 +118,14 @@ const MobileActions: React.FC<MobileActionsProps> = ({
               </Button>}
               <Button
                 onClick={handleAddToCart}
-                disabled={!inStock || !variant}
+                disabled={
+                  !variant ||
+                  (!inStock &&
+                    !(
+                      variant.allow_backorder === true ||
+                      variant.manage_inventory === false
+                    ))
+                }
                 className="w-full"
                 isLoading={isAdding}
                 data-testid="mobile-cart-button"
@@ -127,6 +134,9 @@ const MobileActions: React.FC<MobileActionsProps> = ({
                   ? "Select variant"
                   : !inStock
                   ? "Out of stock"
+                  : variant.allow_backorder === true ||
+                    variant.manage_inventory === false
+                  ? "Preorder"
                   : "Add to cart"}
               </Button>
             </div>
