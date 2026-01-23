@@ -291,6 +291,7 @@ export default function ProductActions({
           </div>
           <div>availability.sellable: {String(availability?.sellable)}</div>
           <div>availability.preorder: {String(availability?.preorder)}</div>
+          <div>availability.ready: {String(availabilityReady)}</div>
           <div>availability.loading: {String(isCheckingAvailability)}</div>
           <div>availability.error: {availabilityError ?? "(none)"}</div>
           <div>isPreorder: {String(isPreorder)}</div>
