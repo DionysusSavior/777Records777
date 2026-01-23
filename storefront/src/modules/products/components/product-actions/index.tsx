@@ -218,6 +218,12 @@ export default function ProductActions({
           <div>isValidVariant: {String(isValidVariant)}</div>
           <div>needsSelection: {String(needsSelection)}</div>
           <div>isSellable: {String(isSellable)}</div>
+          <div>
+            manage_inventory: {String((selectedVariant as any)?.manage_inventory)}
+          </div>
+          <div>
+            allow_backorder: {String((selectedVariant as any)?.allow_backorder)}
+          </div>
           <div>isPreorder: {String(isPreorder)}</div>
           <div>isInStock: {String(isInStock)}</div>
           <div>isSoldOut: {String(isSoldOut)}</div>
