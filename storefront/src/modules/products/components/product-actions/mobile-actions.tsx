@@ -16,7 +16,8 @@ type MobileActionsProps = {
   variant?: HttpTypes.StoreProductVariant
   options: Record<string, string | undefined>
   updateOptions: (title: string, value: string) => void
-  inStock?: boolean
+  isSellable: boolean
+  isPreorder: boolean
   handleAddToCart: () => void
   isAdding?: boolean
   show: boolean
@@ -28,6 +29,8 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   variant,
   options,
   updateOptions,
+  isSellable,
+  isPreorder,
   handleAddToCart,
   isAdding,
   show,
@@ -50,13 +53,7 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   }, [price])
 
   const isSimple = isSimpleProduct(product)
-  const isSellable =
-    !!variant &&
-    (variant.manage_inventory === false || variant.allow_backorder === true)
-  const isPreorder =
-    !!variant &&
-    variant.manage_inventory === true &&
-    variant.allow_backorder === true
+  const isInStock = isSellable && !isPreorder
 
   return (
     <>
@@ -133,7 +130,7 @@ const MobileActions: React.FC<MobileActionsProps> = ({
                   ? "Select variant"
                   : isPreorder
                   ? "Preorder"
-                  : isSellable
+                  : isInStock
                   ? "Add to cart"
                   : "Out of stock"}
               </Button>
