@@ -119,17 +119,19 @@ export default function ProductActions({
   // ===== Product Action State Machine =====
   const needsSelection = !selectedVariant || !isValidVariant
 
-  const isPreorder =
-    !!selectedVariant &&
-    (selectedVariant.allow_backorder === true ||
-      selectedVariant.manage_inventory === false)
-
-  const isInStock =
+  const isSellable =
     !!selectedVariant &&
     (selectedVariant.manage_inventory === false ||
-      (selectedVariant.inventory_quantity ?? 0) > 0)
+      selectedVariant.allow_backorder === true)
 
-  const isSoldOut = !!selectedVariant && !isPreorder && !isInStock
+  const isInStock = isSellable
+
+  const isPreorder =
+    !!selectedVariant &&
+    selectedVariant.manage_inventory === true &&
+    selectedVariant.allow_backorder === true
+
+  const isSoldOut = !!selectedVariant && !isSellable
 
   const actionLabel = needsSelection
     ? "Select variant"
@@ -198,6 +200,27 @@ export default function ProductActions({
         >
           {actionLabel}
         </Button>
+        {/* TEMP DEBUG: remove after fix */}
+        <div className="text-xs opacity-70 break-words">
+          <div>variantsLen: {product.variants?.length ?? 0}</div>
+          <div>optionsLen: {product.options?.length ?? 0}</div>
+          <div>optionsStateKeys: {Object.keys(options).join(",") || "(none)"}</div>
+          <div>
+            optionsStateVals: {Object.values(options).join(",") || "(none)"}
+          </div>
+          <div>selectedVariantId: {selectedVariant?.id ?? "(undefined)"}</div>
+          <div>
+            selectedVariantOpts:{" "}
+            {selectedVariant?.options
+              ?.map((o: any) => `${o.option_id}:${o.value}`)
+              .join(" | ") ?? "(none)"}
+          </div>
+          <div>isValidVariant: {String(isValidVariant)}</div>
+          <div>needsSelection: {String(needsSelection)}</div>
+          <div>isPreorder: {String(isPreorder)}</div>
+          <div>isInStock: {String(isInStock)}</div>
+          <div>isSoldOut: {String(isSoldOut)}</div>
+        </div>
         <MobileActions
           product={product}
           variant={selectedVariant}

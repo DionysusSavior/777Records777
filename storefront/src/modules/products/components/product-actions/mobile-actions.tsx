@@ -28,7 +28,6 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   variant,
   options,
   updateOptions,
-  inStock,
   handleAddToCart,
   isAdding,
   show,
@@ -51,6 +50,13 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   }, [price])
 
   const isSimple = isSimpleProduct(product)
+  const isSellable =
+    !!variant &&
+    (variant.manage_inventory === false || variant.allow_backorder === true)
+  const isPreorder =
+    !!variant &&
+    variant.manage_inventory === true &&
+    variant.allow_backorder === true
 
   return (
     <>
@@ -118,26 +124,18 @@ const MobileActions: React.FC<MobileActionsProps> = ({
               </Button>}
               <Button
                 onClick={handleAddToCart}
-                disabled={
-                  !variant ||
-                  (!inStock &&
-                    !(
-                      variant.allow_backorder === true ||
-                      variant.manage_inventory === false
-                    ))
-                }
+                disabled={!variant || !isSellable}
                 className="w-full"
                 isLoading={isAdding}
                 data-testid="mobile-cart-button"
               >
                 {!variant
                   ? "Select variant"
-                  : !inStock
-                  ? "Out of stock"
-                  : variant.allow_backorder === true ||
-                    variant.manage_inventory === false
+                  : isPreorder
                   ? "Preorder"
-                  : "Add to cart"}
+                  : isSellable
+                  ? "Add to cart"
+                  : "Out of stock"}
               </Button>
             </div>
           </div>
