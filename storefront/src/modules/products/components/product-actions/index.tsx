@@ -124,12 +124,12 @@ export default function ProductActions({
     (selectedVariant.manage_inventory === false ||
       selectedVariant.allow_backorder === true)
 
-  const isInStock = isSellable
-
   const isPreorder =
     !!selectedVariant &&
     selectedVariant.manage_inventory === true &&
     selectedVariant.allow_backorder === true
+
+  const isInStock = isSellable && !isPreorder
 
   const isSoldOut = !!selectedVariant && !isSellable
 
@@ -217,6 +217,7 @@ export default function ProductActions({
           </div>
           <div>isValidVariant: {String(isValidVariant)}</div>
           <div>needsSelection: {String(needsSelection)}</div>
+          <div>isSellable: {String(isSellable)}</div>
           <div>isPreorder: {String(isPreorder)}</div>
           <div>isInStock: {String(isInStock)}</div>
           <div>isSoldOut: {String(isSoldOut)}</div>
