@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
 
   const headers: Record<string, string> = {}
   if (ADMIN_API_TOKEN) {
-    headers.authorization = `Bearer ${ADMIN_API_TOKEN}`
+    const token = ADMIN_API_TOKEN.trim()
+    headers.authorization = token.startsWith("sk_")
+      ? `Basic ${token}`
+      : `Bearer ${token}`
   }
 
   const response = await fetch(url.toString(), {
