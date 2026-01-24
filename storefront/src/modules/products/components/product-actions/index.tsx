@@ -19,11 +19,6 @@ type ProductActionsProps = {
   disabled?: boolean
 }
 
-type VariantAvailability = {
-  sellable: boolean
-  preorder: boolean
-}
-
 const optionsAsKeymap = (
   variantOptions: HttpTypes.StoreProductVariant["options"]
 ) => {
@@ -46,13 +41,6 @@ export default function ProductActions({
 
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
-  const [availability, setAvailability] = useState<VariantAvailability | null>(
-    null
-  )
-  const [availabilityError, setAvailabilityError] = useState<string | null>(
-    null
-  )
-  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
   const countryCode = useParams().countryCode as string
 
   useEffect(() => {
@@ -128,86 +116,20 @@ export default function ProductActions({
     router.replace(pathname + "?" + params.toString())
   }, [selectedVariant, isValidVariant])
 
-  useEffect(() => {
-    let isActive = true
-    const variantId = selectedVariant?.id
-
-    if (!variantId || !isValidVariant) {
-      setAvailability(null)
-      setAvailabilityError(null)
-      setIsCheckingAvailability(false)
-      return
-    }
-
-    setAvailability(null)
-    setAvailabilityError(null)
-    setIsCheckingAvailability(true)
-
-    const params = new URLSearchParams({ variantId })
-
-    fetch(`/api/variant-availability?${params.toString()}`, {
-      cache: "no-store",
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const message = await res.text()
-          throw new Error(message || "Failed to fetch availability")
-        }
-        return res.json()
-      })
-      .then((data: VariantAvailability) => {
-        if (!isActive) return
-        setAvailability({
-          sellable: Boolean(data?.sellable),
-          preorder: Boolean(data?.preorder),
-        })
-      })
-      .catch((error: any) => {
-        if (!isActive) return
-        setAvailabilityError(
-          error?.message || "Failed to fetch availability"
-        )
-        setAvailability(null)
-      })
-      .finally(() => {
-        if (!isActive) return
-        setIsCheckingAvailability(false)
-      })
-
-    return () => {
-      isActive = false
-    }
-  }, [selectedVariant?.id, isValidVariant])
-
   // ===== Product Action State Machine =====
   const needsSelection = !selectedVariant || !isValidVariant
 
-  const availabilityReady = availability !== null
+  const canBuy = !!selectedVariant && !needsSelection
 
-  const isSellable = !!selectedVariant && availability?.sellable === true
-
-  const isPreorder = !!selectedVariant && availability?.preorder === true
-
-  const isInStock = isSellable && !isPreorder
-
-  const isSoldOut = !!selectedVariant && availabilityReady && !isSellable
+  const isPreorder = Boolean(product?.metadata?.preorder)
 
   const actionLabel = needsSelection
     ? "Select variant"
-    : !availabilityReady
-    ? "Checking availability"
     : isPreorder
     ? "Preorder"
-    : isInStock
-    ? "Add to cart"
-    : "Out of stock"
+    : "Add to cart"
 
-  const actionDisabled =
-    needsSelection ||
-    isAdding ||
-    !!disabled ||
-    !availabilityReady ||
-    isSoldOut
+  const actionDisabled = needsSelection || isAdding || !selectedVariant
 
   const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -282,30 +204,16 @@ export default function ProductActions({
           </div>
           <div>isValidVariant: {String(isValidVariant)}</div>
           <div>needsSelection: {String(needsSelection)}</div>
-          <div>isSellable: {String(isSellable)}</div>
-          <div>
-            manage_inventory: {String((selectedVariant as any)?.manage_inventory)}
-          </div>
-          <div>
-            allow_backorder: {String((selectedVariant as any)?.allow_backorder)}
-          </div>
-          <div>availability.sellable: {String(availability?.sellable)}</div>
-          <div>availability.preorder: {String(availability?.preorder)}</div>
-          <div>availability.ready: {String(availabilityReady)}</div>
-          <div>availability.loading: {String(isCheckingAvailability)}</div>
-          <div>availability.error: {availabilityError ?? "(none)"}</div>
+          <div>canBuy: {String(canBuy)}</div>
           <div>isPreorder: {String(isPreorder)}</div>
-          <div>isInStock: {String(isInStock)}</div>
-          <div>isSoldOut: {String(isSoldOut)}</div>
         </div>
         <MobileActions
           product={product}
           variant={selectedVariant}
           options={options}
           updateOptions={setOptionValue}
-          isSellable={isSellable}
+          canBuy={canBuy}
           isPreorder={isPreorder}
-          availabilityReady={availabilityReady}
           handleAddToCart={handleAddToCart}
           isAdding={isAdding}
           show={!inView}
