@@ -8,25 +8,25 @@ export default function CheckoutLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="w-full bg-white relative small:min-h-screen">
-      <div className="h-16 bg-white border-b ">
+    <div className="w-full relative small:min-h-screen">
+      <div className="h-16 border-b border-white/10 bg-[rgba(10,12,20,0.8)] backdrop-blur-xl shadow-[0_0_40px_rgba(120,240,255,0.15)]">
         <nav className="flex h-full items-center content-container justify-between">
           <LocalizedClientLink
             href="/cart"
-            className="text-small-semi text-ui-fg-base flex items-center gap-x-2 uppercase flex-1 basis-0"
+            className="text-small-semi text-white/80 hover:text-white flex items-center gap-x-2 uppercase flex-1 basis-0"
             data-testid="back-to-cart-link"
           >
             <ChevronDown className="rotate-90" size={16} />
-            <span className="mt-px hidden small:block txt-compact-plus text-ui-fg-subtle hover:text-ui-fg-base ">
+            <span className="mt-px hidden small:block txt-compact-plus text-white/60 hover:text-white">
               Back to shopping cart
             </span>
-            <span className="mt-px block small:hidden txt-compact-plus text-ui-fg-subtle hover:text-ui-fg-base">
+            <span className="mt-px block small:hidden txt-compact-plus text-white/60 hover:text-white">
               Back
             </span>
           </LocalizedClientLink>
           <LocalizedClientLink
             href="/"
-            className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
+            className="txt-compact-xlarge-plus uppercase holo-text hover:opacity-90 transition-opacity"
             data-testid="store-link"
           >
             777Records777 Studio
