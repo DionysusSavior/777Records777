@@ -2,7 +2,6 @@ import ItemsTemplate from "./items"
 import Summary from "./summary"
 import EmptyCartMessage from "../components/empty-cart-message"
 import SignInPrompt from "../components/sign-in-prompt"
-import Divider from "@modules/common/components/divider"
 import { HttpTypes } from "@medusajs/types"
 
 const CartTemplate = ({
@@ -12,31 +11,42 @@ const CartTemplate = ({
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
 }) => {
+  const hasItems = !!cart?.items?.length
+  const isPreorderCart = cart?.items?.length
+    ? cart.items.every((item) => {
+        const preorder = item.variant?.product?.metadata?.preorder
+        if (preorder === undefined) {
+          return true
+        }
+        return preorder === true || preorder === "true"
+      })
+    : false
+  const showSummary = Boolean(cart && cart.region && !isPreorderCart)
+  const gridClass = showSummary
+    ? "grid grid-cols-1 gap-10 small:grid-cols-[minmax(0,1fr)_360px]"
+    : "grid grid-cols-1"
+
   return (
     <div className="py-12">
       <div className="content-container" data-testid="cart-container">
-        {cart?.items?.length ? (
-          <div className="grid grid-cols-1 small:grid-cols-[1fr_360px] gap-x-40">
-            <div className="flex flex-col bg-white py-6 gap-y-6">
-              {!customer && (
-                <>
-                  <SignInPrompt />
-                  <Divider />
-                </>
-              )}
-              <ItemsTemplate cart={cart} />
-            </div>
-            <div className="relative">
-              <div className="flex flex-col gap-y-8 sticky top-12">
-                {cart && cart.region && (
-                  <>
-                    <div className="bg-white py-6">
-                      <Summary cart={cart as any} />
-                    </div>
-                  </>
-                )}
+        {hasItems ? (
+          <div className={gridClass}>
+            <div className="flex flex-col gap-y-6">
+              {!customer && <SignInPrompt />}
+              <div className="glass-panel rounded-3xl px-6 py-8">
+                <ItemsTemplate
+                  cart={cart}
+                  showCheckoutAction={!showSummary}
+                />
               </div>
             </div>
+            {showSummary && (
+              <div className="relative">
+                <div className="flex flex-col gap-y-8 sticky top-12">
+                  <Summary cart={cart as any} />
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div>
