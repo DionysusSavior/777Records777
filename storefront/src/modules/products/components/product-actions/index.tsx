@@ -187,7 +187,7 @@ export default function ProductActions({
         >
           {actionLabel}
         </Button>
-        {/* TEMP DEBUG: remove after fix */}
+        {/*
         <div className="text-xs opacity-70 break-words">
           <div>variantsLen: {product.variants?.length ?? 0}</div>
           <div>optionsLen: {product.options?.length ?? 0}</div>
@@ -207,6 +207,7 @@ export default function ProductActions({
           <div>canBuy: {String(canBuy)}</div>
           <div>isPreorder: {String(isPreorder)}</div>
         </div>
+        */}
         <MobileActions
           product={product}
           variant={selectedVariant}
