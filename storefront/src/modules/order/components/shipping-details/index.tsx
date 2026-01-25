@@ -9,6 +9,10 @@ type ShippingDetailsProps = {
 }
 
 const ShippingDetails = ({ order }: ShippingDetailsProps) => {
+  const shippingMethod = order.shipping_methods?.[0]
+  const shippingTotal =
+    shippingMethod?.total ?? shippingMethod?.amount ?? 0
+
   return (
     <div>
       <Heading level="h2" className="flex flex-row text-3xl-regular my-6">
@@ -56,12 +60,12 @@ const ShippingDetails = ({ order }: ShippingDetailsProps) => {
         >
           <Text className="txt-medium-plus text-ui-fg-base mb-1">Method</Text>
           <Text className="txt-medium text-ui-fg-subtle">
-            {(order as any).shipping_methods[0]?.name} (
-            {convertToLocale({
-              amount: order.shipping_methods?.[0].total ?? 0,
-              currency_code: order.currency_code,
-            })}
-            )
+            {shippingMethod
+              ? `${shippingMethod.name} (${convertToLocale({
+                  amount: shippingTotal,
+                  currency_code: order.currency_code,
+                })})`
+              : "Shipping method unavailable"}
           </Text>
         </div>
       </div>

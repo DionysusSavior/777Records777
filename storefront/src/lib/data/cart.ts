@@ -335,6 +335,7 @@ export async function submitPromotionForm(
 
 // TODO: Pass a POJO instead of a form entity here
 export async function setAddresses(currentState: unknown, formData: FormData) {
+  let redirectTo: string | undefined
   try {
     if (!formData) {
       throw new Error("No form data found when setting addresses")
@@ -344,6 +345,7 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
       throw new Error("No existing cart found when setting addresses")
     }
 
+    redirectTo = formData.get("redirect_to")?.toString()
     const data = {
       shipping_address: {
         first_name: formData.get("shipping_address.first_name"),
@@ -376,14 +378,29 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
         province: formData.get("billing_address.province"),
         phone: formData.get("billing_address.phone"),
       }
+
+    if (redirectTo === "preorder") {
+      data.metadata = {
+        preorder: true,
+        preorder_submitted: true,
+        preorder_submitted_at: new Date().toISOString(),
+      }
+    }
     await updateCart(data)
   } catch (e: any) {
     return e.message
   }
 
-  redirect(
-    `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
-  )
+  const countryCode = formData
+    .get("shipping_address.country_code")
+    ?.toString()
+
+  if (redirectTo === "preorder" && countryCode) {
+    await removeCartId()
+    redirect(`/${countryCode}/preorder/confirmed`)
+  }
+
+  redirect(`/${countryCode}/checkout?step=delivery`)
 }
 
 /**

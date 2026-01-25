@@ -8,9 +8,16 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 type ItemsTemplateProps = {
   cart?: HttpTypes.StoreCart
   showCheckoutAction?: boolean
+  isPreorder?: boolean
 }
 
-const getCheckoutStep = (cart?: HttpTypes.StoreCart) => {
+const getCheckoutStep = (
+  cart?: HttpTypes.StoreCart,
+  isPreorder?: boolean
+) => {
+  if (isPreorder) {
+    return "address"
+  }
   if (!cart?.shipping_address?.address_1 || !cart.email) {
     return "address"
   } else if (cart?.shipping_methods?.length === 0) {
@@ -23,9 +30,10 @@ const getCheckoutStep = (cart?: HttpTypes.StoreCart) => {
 const ItemsTemplate = ({
   cart,
   showCheckoutAction = false,
+  isPreorder = false,
 }: ItemsTemplateProps) => {
   const items = cart?.items
-  const step = getCheckoutStep(cart)
+  const step = getCheckoutStep(cart, isPreorder)
 
   return (
     <div>

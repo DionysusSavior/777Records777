@@ -37,6 +37,7 @@ const CartTemplate = ({
                 <ItemsTemplate
                   cart={cart}
                   showCheckoutAction={!showSummary}
+                  isPreorder={isPreorderCart}
                 />
               </div>
             </div>

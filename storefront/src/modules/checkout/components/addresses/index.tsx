@@ -17,15 +17,17 @@ import { SubmitButton } from "../submit-button"
 const Addresses = ({
   cart,
   customer,
+  isPreorder = false,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
+  isPreorder?: boolean
 }) => {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
-  const isOpen = searchParams.get("step") === "address"
+  const isOpen = isPreorder || searchParams.get("step") === "address"
 
   const { state: sameAsBilling, toggle: toggleSameAsBilling } = useToggleState(
     cart?.shipping_address && cart?.billing_address
@@ -63,15 +65,22 @@ const Addresses = ({
       </div>
       {isOpen ? (
         <form action={formAction}>
+          {isPreorder && (
+            <>
+              <input type="hidden" name="redirect_to" value="preorder" />
+              <input type="hidden" name="same_as_billing" value="on" />
+            </>
+          )}
           <div className="pb-8">
             <ShippingAddress
               customer={customer}
               checked={sameAsBilling}
               onChange={toggleSameAsBilling}
+              showBillingCheckbox={!isPreorder}
               cart={cart}
             />
 
-            {!sameAsBilling && (
+            {!isPreorder && !sameAsBilling && (
               <div>
                 <Heading
                   level="h2"
@@ -84,7 +93,7 @@ const Addresses = ({
               </div>
             )}
             <SubmitButton className="mt-6" data-testid="submit-address-button">
-              Continue to delivery
+              {isPreorder ? "Submit preorder" : "Continue to delivery"}
             </SubmitButton>
             <ErrorMessage error={message} data-testid="address-error-message" />
           </div>

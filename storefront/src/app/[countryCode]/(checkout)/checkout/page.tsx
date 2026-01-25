@@ -18,11 +18,24 @@ export default async function Checkout() {
   }
 
   const customer = await retrieveCustomer()
+  const isPreorderCart = cart.items?.length
+    ? cart.items.every((item) => {
+        const preorder = item.variant?.product?.metadata?.preorder
+        if (preorder === undefined) {
+          return true
+        }
+        return preorder === true || preorder === "true"
+      })
+    : false
 
   return (
     <div className="grid grid-cols-1 small:grid-cols-[1fr_416px] content-container gap-x-40 py-12">
       <PaymentWrapper cart={cart}>
-        <CheckoutForm cart={cart} customer={customer} />
+        <CheckoutForm
+          cart={cart}
+          customer={customer}
+          isPreorder={isPreorderCart}
+        />
       </PaymentWrapper>
       <CheckoutSummary cart={cart} />
     </div>

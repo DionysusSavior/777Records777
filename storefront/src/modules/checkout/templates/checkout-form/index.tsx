@@ -9,12 +9,22 @@ import Shipping from "@modules/checkout/components/shipping"
 export default async function CheckoutForm({
   cart,
   customer,
+  isPreorder = false,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
+  isPreorder?: boolean
 }) {
   if (!cart) {
     return null
+  }
+
+  if (isPreorder) {
+    return (
+      <div className="w-full grid grid-cols-1 gap-y-8">
+        <Addresses cart={cart} customer={customer} isPreorder />
+      </div>
+    )
   }
 
   const shippingMethods = await listCartShippingMethods(cart.id)
