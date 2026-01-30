@@ -21,10 +21,14 @@ const PREORDER_SIZES = [
   "War-Level  (XXL)",
 ] as const
 
-const SOUND_DOWNLOADS: Record<string, { url: string; label: string }> = {
+const SOUND_DOWNLOADS: Record<
+  string,
+  { url: string; label: string; om7PlayerUrl?: string }
+> = {
   prod_01KG8CPWZ9T008217JZYTM3EKW: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess+of+Love+(feat.+Kap+G).wav",
-    label: "Download WAV",
+    label: "Download Goddess Of Love",
+    om7PlayerUrl: "",
   },
 }
 
@@ -159,8 +163,13 @@ export default function ProductActions({
             typeof product.metadata.download_label === "string"
               ? product.metadata.download_label
               : "Download",
+          om7PlayerUrl:
+            typeof product.metadata.om7player_url === "string"
+              ? product.metadata.om7player_url
+              : undefined,
         }
       : null)
+  const isDownloadOnly = Boolean(soundDownload)
 
   const actionLabel = needsSelection
     ? "Select variant"
@@ -224,7 +233,9 @@ export default function ProductActions({
           )}
         </div>
 
-        <ProductPrice product={product} variant={selectedVariant} />
+        {!isDownloadOnly && (
+          <ProductPrice product={product} variant={selectedVariant} />
+        )}
 
         {requiresPreorderSize && (
           <div className="flex flex-col gap-y-3">
@@ -252,27 +263,46 @@ export default function ProductActions({
           </div>
         )}
 
-        <Button
-          onClick={handleAddToCart}
-          disabled={actionDisabled}
-          variant="primary"
-          className="w-full h-10"
-          isLoading={isAdding}
-          data-testid="add-product-button"
-        >
-          {actionLabel}
-        </Button>
-        {soundDownload && (
-          <Button asChild variant="secondary" className="w-full h-10">
-            <a
-              href={soundDownload.url}
-              download
-              target="_blank"
-              rel="noreferrer"
-            >
-              {soundDownload.label}
-            </a>
+        {!isDownloadOnly && (
+          <Button
+            onClick={handleAddToCart}
+            disabled={actionDisabled}
+            variant="primary"
+            className="w-full h-10"
+            isLoading={isAdding}
+            data-testid="add-product-button"
+          >
+            {actionLabel}
           </Button>
+        )}
+        {soundDownload && (
+          <>
+            <Button asChild variant="primary" className="w-full h-10">
+              <a
+                href={soundDownload.url}
+                download
+                target="_blank"
+                rel="noreferrer"
+              >
+                {soundDownload.label}
+              </a>
+            </Button>
+            {soundDownload.om7PlayerUrl ? (
+              <Button asChild variant="secondary" className="w-full h-10">
+                <a
+                  href={soundDownload.om7PlayerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Download OM7Player
+                </a>
+              </Button>
+            ) : (
+              <Button variant="secondary" className="w-full h-10" disabled>
+                Download OM7Player
+              </Button>
+            )}
+          </>
         )}
         {/*
         <div className="text-xs opacity-70 break-words">
@@ -295,22 +325,24 @@ export default function ProductActions({
           <div>isPreorder: {String(isPreorder)}</div>
         </div>
         */}
-        <MobileActions
-          product={product}
-          variant={selectedVariant}
-          options={options}
-          updateOptions={setOptionValue}
-          canBuy={canBuy}
-          isPreorder={isPreorder}
-          showPreorderSize={requiresPreorderSize}
-          preorderSize={preorderSize}
-          setPreorderSize={setPreorderSize}
-          preorderSizes={PREORDER_SIZES}
-          handleAddToCart={handleAddToCart}
-          isAdding={isAdding}
-          show={!inView}
-          optionsDisabled={!!disabled || isAdding}
-        />
+        {!isDownloadOnly && (
+          <MobileActions
+            product={product}
+            variant={selectedVariant}
+            options={options}
+            updateOptions={setOptionValue}
+            canBuy={canBuy}
+            isPreorder={isPreorder}
+            showPreorderSize={requiresPreorderSize}
+            preorderSize={preorderSize}
+            setPreorderSize={setPreorderSize}
+            preorderSizes={PREORDER_SIZES}
+            handleAddToCart={handleAddToCart}
+            isAdding={isAdding}
+            show={!inView}
+            optionsDisabled={!!disabled || isAdding}
+          />
+        )}
       </div>
     </>
   )
