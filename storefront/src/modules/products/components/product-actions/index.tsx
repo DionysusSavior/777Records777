@@ -3,7 +3,7 @@
 import { addToCart } from "@lib/data/cart"
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { HttpTypes } from "@medusajs/types"
-import { Button } from "@medusajs/ui"
+import { Button, clx } from "@medusajs/ui"
 import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/product-actions/option-select"
 import { isEqual } from "lodash"
@@ -12,6 +12,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import ProductPrice from "../product-price"
 import MobileActions from "./mobile-actions"
 import { useRouter } from "next/navigation"
+
+const PREORDER_SIZES = ["Small", "Medium", "Large", "Tall"] as const
 
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
@@ -41,6 +43,9 @@ export default function ProductActions({
 
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
+  const [preorderSize, setPreorderSize] = useState<string | undefined>(
+    undefined
+  )
   const countryCode = useParams().countryCode as string
 
   useEffect(() => {
@@ -73,6 +78,12 @@ export default function ProductActions({
       return isEqual(variantOptions, options)
     })
   }, [product.variants, options])
+
+  const hasSizeOption = useMemo(() => {
+    return (product.options || []).some((option) => {
+      return (option.title || "").trim().toLowerCase() === "size"
+    })
+  }, [product.options])
 
   // update the options when a variant is selected
   const setOptionValue = (optionId: string, value: string) => {
@@ -119,17 +130,23 @@ export default function ProductActions({
   // ===== Product Action State Machine =====
   const needsSelection = !selectedVariant || !isValidVariant
 
-  const canBuy = !!selectedVariant && !needsSelection
-
   const isPreorder = Boolean(product?.metadata?.preorder)
+
+  const requiresPreorderSize = isPreorder && !hasSizeOption
+  const needsPreorderSize = requiresPreorderSize && !preorderSize
+
+  const canBuy = !!selectedVariant && !needsSelection && !needsPreorderSize
 
   const actionLabel = needsSelection
     ? "Select variant"
+    : needsPreorderSize
+    ? "Select size"
     : isPreorder
     ? "Preorder"
     : "Add to cart"
 
-  const actionDisabled = needsSelection || isAdding || !selectedVariant
+  const actionDisabled =
+    needsSelection || needsPreorderSize || isAdding || !selectedVariant
 
   const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -138,6 +155,7 @@ export default function ProductActions({
   // add the selected variant to the cart
   const handleAddToCart = async () => {
     if (!selectedVariant?.id) return null
+    if (needsPreorderSize) return null
 
     setIsAdding(true)
 
@@ -145,6 +163,12 @@ export default function ProductActions({
       variantId: selectedVariant.id,
       quantity: 1,
       countryCode,
+      metadata:
+        requiresPreorderSize && preorderSize
+          ? {
+              preorder_size: preorderSize,
+            }
+          : undefined,
     })
 
     setIsAdding(false)
@@ -176,6 +200,32 @@ export default function ProductActions({
         </div>
 
         <ProductPrice product={product} variant={selectedVariant} />
+
+        {requiresPreorderSize && (
+          <div className="flex flex-col gap-y-3">
+            <span className="text-sm">Select size</span>
+            <div className="flex flex-wrap gap-2">
+              {PREORDER_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setPreorderSize(size)}
+                  disabled={!!disabled || isAdding}
+                  className={clx(
+                    "border-ui-border-base bg-ui-bg-subtle border text-small-regular h-10 rounded-rounded px-4 flex-1 min-w-[96px]",
+                    {
+                      "border-ui-border-interactive": size === preorderSize,
+                      "hover:shadow-elevation-card-rest transition-shadow ease-in-out duration-150":
+                        size !== preorderSize,
+                    }
+                  )}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Button
           onClick={handleAddToCart}
@@ -215,6 +265,10 @@ export default function ProductActions({
           updateOptions={setOptionValue}
           canBuy={canBuy}
           isPreorder={isPreorder}
+          showPreorderSize={requiresPreorderSize}
+          preorderSize={preorderSize}
+          setPreorderSize={setPreorderSize}
+          preorderSizes={PREORDER_SIZES}
           handleAddToCart={handleAddToCart}
           isAdding={isAdding}
           show={!inView}

@@ -48,6 +48,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       "shipping_address.*",
       "items.title",
       "items.quantity",
+      "items.metadata",
     ],
   })
 

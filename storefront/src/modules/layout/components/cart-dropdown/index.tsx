@@ -99,11 +99,11 @@ const CartDropdown = ({
         >
           <PopoverPanel
             static
-            className="hidden small:block absolute top-[calc(100%+1px)] right-0 bg-white border-x border-b border-gray-200 w-[420px] text-ui-fg-base"
+            className="hidden small:block absolute top-[calc(100%+1px)] right-0 w-[420px] text-ui-fg-on-color glass-panel rounded-2xl backdrop-blur-2xl"
             data-testid="nav-cart-dropdown"
           >
-            <div className="p-4 flex items-center justify-center">
-              <h3 className="text-large-semi">Cart</h3>
+            <div className="p-4 flex items-center justify-center border-b border-white/10">
+              <h3 className="text-large-semi holo-text">Cart</h3>
             </div>
             {cartState && cartState.items?.length ? (
               <>
@@ -144,6 +144,7 @@ const CartDropdown = ({
                                 </h3>
                                 <LineItemOptions
                                   variant={item.variant}
+                                  metadata={item.metadata}
                                   data-testid="cart-item-variant"
                                   data-value={item.variant}
                                 />
@@ -174,9 +175,9 @@ const CartDropdown = ({
                       </div>
                     ))}
                 </div>
-                <div className="p-4 flex flex-col gap-y-4 text-small-regular">
+                <div className="p-4 flex flex-col gap-y-4 text-small-regular border-t border-white/10">
                   <div className="flex items-center justify-between">
-                    <span className="text-ui-fg-base font-semibold">
+                    <span className="text-ui-fg-on-color font-semibold">
                       Subtotal{" "}
                       <span className="font-normal">(excl. taxes)</span>
                     </span>
@@ -205,10 +206,12 @@ const CartDropdown = ({
             ) : (
               <div>
                 <div className="flex py-16 flex-col gap-y-4 items-center justify-center">
-                  <div className="bg-gray-900 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
+                  <div className="bg-white/10 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
                     <span>0</span>
                   </div>
-                  <span>Your shopping bag is empty.</span>
+                  <span className="text-ui-fg-on-color">
+                    Your shopping bag is empty.
+                  </span>
                   <div>
                     <LocalizedClientLink href="/store">
                       <>

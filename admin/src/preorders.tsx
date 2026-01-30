@@ -4,6 +4,7 @@ import { Badge, Container, Heading, Table, Text } from "@medusajs/ui"
 type PreorderItem = {
   title?: string | null
   quantity?: number | null
+  metadata?: Record<string, unknown> | null
 }
 
 type PreorderAddress = {
@@ -213,12 +214,15 @@ const PreordersPage = () => {
                         </div>
                       </Table.Cell>
                       <Table.Cell>
-                        <div className="flex flex-col gap-1">
-                          {items.slice(0, 3).map((item, index) => (
-                            <Text size="xsmall" key={`${preorder.id}-${index}`}>
-                              {item.title || "Item"} x{item.quantity ?? 0}
-                            </Text>
-                          ))}
+                  <div className="flex flex-col gap-1">
+                    {items.slice(0, 3).map((item, index) => (
+                      <Text size="xsmall" key={`${preorder.id}-${index}`}>
+                        {item.title || "Item"} x{item.quantity ?? 0}
+                        {typeof item.metadata?.preorder_size === "string"
+                          ? ` - Size: ${item.metadata.preorder_size}`
+                          : ""}
+                      </Text>
+                    ))}
                           {items.length > 3 && (
                             <Text size="xsmall" className="text-ui-fg-subtle">
                               +{items.length - 3} more

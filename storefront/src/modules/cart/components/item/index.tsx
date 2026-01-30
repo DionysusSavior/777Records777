@@ -70,7 +70,11 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
           >
             {item.product_title}
           </Text>
-          <LineItemOptions variant={item.variant} data-testid="product-variant" />
+          <LineItemOptions
+            variant={item.variant}
+            metadata={item.metadata}
+            data-testid="product-variant"
+          />
         </Table.Cell>
 
         {type === "full" && (
@@ -169,6 +173,7 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
           </Text>
           <LineItemOptions
             variant={item.variant}
+            metadata={item.metadata}
             data-testid="product-variant"
             className="text-white/60"
           />

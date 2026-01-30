@@ -9,6 +9,7 @@ declare const __JWT_TOKEN_STORAGE_KEY__: string
 type PreorderItem = {
   title?: string | null
   quantity?: number | null
+  metadata?: Record<string, unknown> | null
 }
 
 type PreorderAddress = {
@@ -236,6 +237,9 @@ const PreordersPage = () => {
                           {items.slice(0, 3).map((item, index) => (
                             <Text size="xsmall" key={`${preorder.id}-${index}`}>
                               {item.title || "Item"} x{item.quantity ?? 0}
+                              {typeof item.metadata?.preorder_size === "string"
+                                ? ` - Size: ${item.metadata.preorder_size}`
+                                : ""}
                             </Text>
                           ))}
                           {items.length > 3 && (

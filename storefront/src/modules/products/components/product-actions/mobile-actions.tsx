@@ -18,6 +18,10 @@ type MobileActionsProps = {
   updateOptions: (title: string, value: string) => void
   canBuy: boolean
   isPreorder: boolean
+  showPreorderSize: boolean
+  preorderSizes: readonly string[]
+  preorderSize?: string
+  setPreorderSize: (size: string) => void
   handleAddToCart: () => void
   isAdding?: boolean
   show: boolean
@@ -31,6 +35,10 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   updateOptions,
   canBuy,
   isPreorder,
+  showPreorderSize,
+  preorderSizes,
+  preorderSize,
+  setPreorderSize,
   handleAddToCart,
   isAdding,
   show,
@@ -53,6 +61,8 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   }, [price])
 
   const isSimple = isSimpleProduct(product)
+
+  const showSelector = !isSimple || showPreorderSize
 
   return (
     <>
@@ -100,24 +110,30 @@ const MobileActions: React.FC<MobileActionsProps> = ({
                 <div></div>
               )}
             </div>
-            <div className={clx("grid grid-cols-2 w-full gap-x-4", {
-              "!grid-cols-1": isSimple
-            })}>
-              {!isSimple && <Button
-                onClick={open}
-                variant="secondary"
-                className="w-full"
-                data-testid="mobile-actions-button"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span>
-                    {variant
-                      ? Object.values(options).join(" / ")
-                      : "Select Options"}
-                  </span>
-                  <ChevronDown />
-                </div>
-              </Button>}
+            <div
+              className={clx("grid grid-cols-2 w-full gap-x-4", {
+                "!grid-cols-1": !showSelector,
+              })}
+            >
+              {showSelector && (
+                <Button
+                  onClick={open}
+                  variant="secondary"
+                  className="w-full"
+                  data-testid="mobile-actions-button"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span>
+                      {showPreorderSize
+                        ? preorderSize || "Select size"
+                        : variant
+                        ? Object.values(options).join(" / ")
+                        : "Select Options"}
+                    </span>
+                    <ChevronDown />
+                  </div>
+                </Button>
+              )}
               <Button
                 onClick={handleAddToCart}
                 disabled={!variant || isAdding || !canBuy}
@@ -174,23 +190,51 @@ const MobileActions: React.FC<MobileActionsProps> = ({
                     </button>
                   </div>
                   <div className="bg-white px-6 py-12">
-                    {(product.variants?.length ?? 0) > 1 && (
-                      <div className="flex flex-col gap-y-6">
-                        {(product.options || []).map((option) => {
-                          return (
-                            <div key={option.id}>
-                              <OptionSelect
-                                option={option}
-                                current={options[option.id]}
-                                updateOption={updateOptions}
-                                title={option.title ?? ""}
+                    <div className="flex flex-col gap-y-6">
+                      {showPreorderSize && (
+                        <div className="flex flex-col gap-y-3">
+                          <span className="text-sm">Select size</span>
+                          <div className="flex flex-wrap gap-2">
+                            {preorderSizes.map((size) => (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setPreorderSize(size)}
                                 disabled={optionsDisabled}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                                className={clx(
+                                  "border-ui-border-base bg-ui-bg-subtle border text-small-regular h-10 rounded-rounded px-4 flex-1 min-w-[96px]",
+                                  {
+                                    "border-ui-border-interactive":
+                                      size === preorderSize,
+                                    "hover:shadow-elevation-card-rest transition-shadow ease-in-out duration-150":
+                                      size !== preorderSize,
+                                  }
+                                )}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(product.variants?.length ?? 0) > 1 && (
+                        <div className="flex flex-col gap-y-6">
+                          {(product.options || []).map((option) => {
+                            return (
+                              <div key={option.id}>
+                                <OptionSelect
+                                  option={option}
+                                  current={options[option.id]}
+                                  updateOption={updateOptions}
+                                  title={option.title ?? ""}
+                                  disabled={optionsDisabled}
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Dialog.Panel>
               </Transition.Child>
