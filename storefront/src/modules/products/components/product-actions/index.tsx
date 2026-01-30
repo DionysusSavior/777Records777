@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import ProductPrice from "../product-price"
 import MobileActions from "./mobile-actions"
 import { useRouter } from "next/navigation"
+import { getSoundDownload } from "@lib/sounds"
 
 const PREORDER_SIZES = [
   "Drone Operator (S)",
@@ -20,17 +21,6 @@ const PREORDER_SIZES = [
   "Breakthrough Element (XL)",
   "War-Level  (XXL)",
 ] as const
-
-const SOUND_DOWNLOADS: Record<
-  string,
-  { url: string; label: string; om7PlayerUrl?: string }
-> = {
-  prod_01KG8CPWZ9T008217JZYTM3EKW: {
-    url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess+of+Love+(feat.+Kap+G).wav",
-    label: "Download Goddess Of Love",
-    om7PlayerUrl: "",
-  },
-}
 
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
@@ -154,21 +144,7 @@ export default function ProductActions({
 
   const canBuy = !!selectedVariant && !needsSelection && !needsPreorderSize
 
-  const soundDownload =
-    SOUND_DOWNLOADS[product.id] ||
-    (typeof product.metadata?.download_url === "string"
-      ? {
-          url: product.metadata.download_url,
-          label:
-            typeof product.metadata.download_label === "string"
-              ? product.metadata.download_label
-              : "Download",
-          om7PlayerUrl:
-            typeof product.metadata.om7player_url === "string"
-              ? product.metadata.om7player_url
-              : undefined,
-        }
-      : null)
+  const soundDownload = getSoundDownload(product)
   const isDownloadOnly = Boolean(soundDownload)
 
   const actionLabel = needsSelection

@@ -2,6 +2,7 @@ import { Metadata } from "next"
 
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import StoreTemplate from "@modules/store/templates"
+import { SOUND_PRODUCT_IDS } from "@lib/sounds"
 
 export const metadata: Metadata = {
   title: "Sounds",
@@ -23,14 +24,12 @@ export default async function SoundsPage(props: Params) {
   const searchParams = await props.searchParams
   const { sortBy, page } = searchParams
 
-  const soundsProductIds = ["prod_01KG8CPWZ9T008217JZYTM3EKW"]
-
   return (
     <StoreTemplate
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
-      productsIds={soundsProductIds}
+      productsIds={SOUND_PRODUCT_IDS}
       pageTitle="Sounds"
     />
   )

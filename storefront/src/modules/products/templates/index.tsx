@@ -9,8 +9,10 @@ import ProductInfo from "@modules/products/templates/product-info"
 import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-related-products"
 import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
+import { Heading } from "@medusajs/ui"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
+import { isSoundProduct } from "@lib/sounds"
 
 type ProductTemplateProps = {
   product: HttpTypes.StoreProduct
@@ -29,21 +31,34 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
     return notFound()
   }
 
+  const soundProduct = isSoundProduct(product)
+
   return (
     <>
       <div
         className="content-container  flex flex-col small:flex-row small:items-start py-6 relative"
         data-testid="product-container"
       >
-        <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
-          <ProductInfo product={product} />
-          <ProductTabs product={product} />
-        </div>
+        {!soundProduct && (
+          <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
+            <ProductInfo product={product} />
+            <ProductTabs product={product} />
+          </div>
+        )}
         <div className="block w-full relative">
           <ImageGallery images={images} />
         </div>
         <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-12">
-          <ProductOnboardingCta />
+          {soundProduct && (
+            <Heading
+              level="h2"
+              className="text-3xl leading-10 text-ui-fg-base"
+              data-testid="product-title"
+            >
+              {product.title}
+            </Heading>
+          )}
+          {!soundProduct && <ProductOnboardingCta />}
           <Suspense
             fallback={
               <ProductActions
