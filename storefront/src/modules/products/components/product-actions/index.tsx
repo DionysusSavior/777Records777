@@ -21,6 +21,13 @@ const PREORDER_SIZES = [
   "War-Level  (XXL)",
 ] as const
 
+const SOUND_DOWNLOADS: Record<string, { url: string; label: string }> = {
+  prod_01KG8CPWZ9T008217JZYTM3EKW: {
+    url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess+of+Love+(feat.+Kap+G).wav",
+    label: "Download WAV",
+  },
+}
+
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
   region: HttpTypes.StoreRegion
@@ -143,6 +150,18 @@ export default function ProductActions({
 
   const canBuy = !!selectedVariant && !needsSelection && !needsPreorderSize
 
+  const soundDownload =
+    SOUND_DOWNLOADS[product.id] ||
+    (typeof product.metadata?.download_url === "string"
+      ? {
+          url: product.metadata.download_url,
+          label:
+            typeof product.metadata.download_label === "string"
+              ? product.metadata.download_label
+              : "Download",
+        }
+      : null)
+
   const actionLabel = needsSelection
     ? "Select variant"
     : needsPreorderSize
@@ -243,6 +262,18 @@ export default function ProductActions({
         >
           {actionLabel}
         </Button>
+        {soundDownload && (
+          <Button asChild variant="secondary" className="w-full h-10">
+            <a
+              href={soundDownload.url}
+              download
+              target="_blank"
+              rel="noreferrer"
+            >
+              {soundDownload.label}
+            </a>
+          </Button>
+        )}
         {/*
         <div className="text-xs opacity-70 break-words">
           <div>variantsLen: {product.variants?.length ?? 0}</div>

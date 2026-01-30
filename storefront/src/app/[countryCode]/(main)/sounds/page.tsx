@@ -23,12 +23,14 @@ export default async function SoundsPage(props: Params) {
   const searchParams = await props.searchParams
   const { sortBy, page } = searchParams
 
+  const soundsProductIds = ["prod_01KG8CPWZ9T008217JZYTM3EKW"]
+
   return (
     <StoreTemplate
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
-      productsIds={[]}
+      productsIds={soundsProductIds}
       pageTitle="Sounds"
     />
   )
