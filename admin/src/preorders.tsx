@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { Badge, Container, Heading, Table, Text } from "@medusajs/ui"
+import { Badge, Button, Container, Heading, Table, Text } from "@medusajs/ui"
 
 type PreorderItem = {
   title?: string | null
@@ -78,6 +78,8 @@ const PreordersPage = () => {
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
 
   const pageIndex = Math.floor(offset / PAGE_SIZE)
   const pageCount = Math.ceil(count / PAGE_SIZE)
@@ -140,13 +142,90 @@ const PreordersPage = () => {
 
   const pageItems = useMemo(() => preorders, [preorders])
 
+  const handleDownload = async () => {
+    setExporting(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/admin/preorders/export", {
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to export preorders (${response.status})`)
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+
+      const link = document.createElement("a")
+      const disposition = response.headers.get("content-disposition")
+      const match = disposition?.match(/filename="([^"]+)"/)
+      link.href = url
+      link.download = match?.[1] || "preorders.csv"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export preorders")
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm(
+      "Delete this preorder? This will remove it from the list."
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingIds((prev) => ({ ...prev, [id]: true }))
+    setError(null)
+
+    try {
+      const response = await fetch(`/admin/preorders/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete preorder (${response.status})`)
+      }
+
+      setPreorders((prev) => prev.filter((preorder) => preorder.id !== id))
+      setCount((prev) => Math.max(prev - 1, 0))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete preorder")
+    } finally {
+      setDeletingIds((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
+  }
+
   return (
     <Container className="divide-y p-0">
-      <div className="px-6 py-4">
-        <Heading>Preorders</Heading>
-        <Text size="small" className="text-ui-fg-subtle">
-          Shipping address submissions saved for upcoming releases.
-        </Text>
+      <div className="px-6 py-4 flex items-start justify-between gap-4">
+        <div>
+          <Heading>Preorders</Heading>
+          <Text size="small" className="text-ui-fg-subtle">
+            Shipping address submissions saved for upcoming releases.
+          </Text>
+        </div>
+        <Button
+          size="small"
+          variant="secondary"
+          onClick={handleDownload}
+          isLoading={exporting}
+        >
+          Download CSV
+        </Button>
       </div>
       <div className="px-0">
         {loading && (
@@ -173,12 +252,15 @@ const PreordersPage = () => {
                   <Table.HeaderCell>Items</Table.HeaderCell>
                   <Table.HeaderCell>Shipping address</Table.HeaderCell>
                   <Table.HeaderCell>Status</Table.HeaderCell>
+                  <Table.HeaderCell className="text-right">
+                    Actions
+                  </Table.HeaderCell>
                 </Table.Row>
               </Table.Header>
               <Table.Body className="border-b-0">
                 {pageItems.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={5}>
+                    <Table.Cell colSpan={6}>
                       <Text size="small" className="text-ui-fg-subtle">
                         No preorders yet.
                       </Text>
@@ -249,6 +331,16 @@ const PreordersPage = () => {
                       </Table.Cell>
                       <Table.Cell>
                         <Badge color="green">Submitted</Badge>
+                      </Table.Cell>
+                      <Table.Cell className="text-right">
+                        <Button
+                          size="small"
+                          variant="danger"
+                          onClick={() => handleDelete(preorder.id)}
+                          isLoading={Boolean(deletingIds[preorder.id])}
+                        >
+                          Delete
+                        </Button>
                       </Table.Cell>
                     </Table.Row>
                   )

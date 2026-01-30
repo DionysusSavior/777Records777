@@ -14,6 +14,11 @@ const MAX_LIMIT = 200
 
 const isPreorderCart = (cart: { metadata?: Record<string, unknown> | null }) => {
   const flag = cart?.metadata?.preorder_submitted
+  const deleted = cart?.metadata?.preorder_deleted
+  if (deleted === true || deleted === "true") {
+    return false
+  }
+
   return flag === true || flag === "true"
 }
 

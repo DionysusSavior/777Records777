@@ -13,7 +13,13 @@ import ProductPrice from "../product-price"
 import MobileActions from "./mobile-actions"
 import { useRouter } from "next/navigation"
 
-const PREORDER_SIZES = ["Small", "Medium", "Large", "Tall"] as const
+const PREORDER_SIZES = [
+  "Drone Operator (S)",
+  "Close Combat (M)",
+  "Mass Effects  (L)",
+  "Breakthrough Element (XL)",
+  "War-Level  (XXL)",
+] as const
 
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
