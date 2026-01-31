@@ -5,6 +5,7 @@ import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "../thumbnail"
 import PreviewPrice from "./price"
+import { isSoundProduct } from "@lib/sounds"
 
 export default async function ProductPreview({
   product,
@@ -46,13 +47,15 @@ export default async function ProductPreview({
     product,
   })
 
+  const isSound = isSoundProduct(product)
+
   return (
     <LocalizedClientLink href={`/products/${product.handle}`} className="group">
       <div data-testid="product-wrapper">
         <Thumbnail
           thumbnail={product.thumbnail}
           images={preferredImages}
-          size="full"
+          size={isSound ? "square" : "full"}
           isFeatured={isFeatured}
         />
         <div className="flex txt-compact-medium mt-4 justify-between">

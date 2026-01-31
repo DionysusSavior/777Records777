@@ -59,6 +59,16 @@ const isVideoUrl = (url?: string) => {
   return /\.(mp4|mov|webm|ogg)$/.test(path)
 }
 
+const shouldBypassOptimization = (url?: string) => {
+  if (!url) {
+    return false
+  }
+
+  return url.includes(
+    "777records777productpageassets.s3.us-east-2.amazonaws.com"
+  )
+}
+
 const MediaOrPlaceholder = ({
   mediaUrl,
   size,
@@ -89,6 +99,7 @@ const MediaOrPlaceholder = ({
         quality={50}
         sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"
         fill
+        unoptimized={shouldBypassOptimization(mediaUrl)}
       />
     )
   }
