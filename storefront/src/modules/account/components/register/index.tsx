@@ -20,12 +20,12 @@ const Register = ({ setCurrentView }: Props) => {
       className="max-w-sm flex flex-col items-center"
       data-testid="register-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">
+      <h1 className="text-large-semi uppercase mb-6 text-white">
         Become a 777Records777 Studio Member
       </h1>
-      <p className="text-center text-base-regular text-ui-fg-base mb-4">
-        Create your 777Records777 Studio Member profile, and get access to an enhanced
-        shopping experience.
+      <p className="text-center text-base-regular text-white/70 mb-4">
+        Create your 777Records777 Studio Member profile, and get access to an
+        enhanced shopping experience.
       </p>
       <form className="w-full flex flex-col" action={formAction}>
         <div className="flex flex-col w-full gap-y-2">
@@ -68,18 +68,18 @@ const Register = ({ setCurrentView }: Props) => {
           />
         </div>
         <ErrorMessage error={message} data-testid="register-error" />
-        <span className="text-center text-ui-fg-base text-small-regular mt-6">
+        <span className="text-center text-white/70 text-small-regular mt-6">
           By creating an account, you agree to 777Records777 Studio&apos;s{" "}
           <LocalizedClientLink
             href="/content/privacy-policy"
-            className="underline"
+            className="underline text-white"
           >
             Privacy Policy
           </LocalizedClientLink>{" "}
           and{" "}
           <LocalizedClientLink
             href="/content/terms-of-use"
-            className="underline"
+            className="underline text-white"
           >
             Terms of Use
           </LocalizedClientLink>
@@ -89,11 +89,11 @@ const Register = ({ setCurrentView }: Props) => {
           Join
         </SubmitButton>
       </form>
-      <span className="text-center text-ui-fg-base text-small-regular mt-6">
+      <span className="text-center text-white/70 text-small-regular mt-6">
         Already a member?{" "}
         <button
           onClick={() => setCurrentView(LOGIN_VIEW.SIGN_IN)}
-          className="underline"
+          className="underline text-white"
         >
           Sign in
         </button>
