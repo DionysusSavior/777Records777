@@ -147,6 +147,8 @@ export default function ProductActions({
   const soundDownload = getSoundDownload(product)
   const isDownloadOnly = Boolean(soundDownload)
 
+  const shouldPulsePreorder = isPreorder && canBuy && !isAdding
+
   const actionLabel = needsSelection
     ? "Select variant"
     : needsPreorderSize
@@ -244,7 +246,9 @@ export default function ProductActions({
             onClick={handleAddToCart}
             disabled={actionDisabled}
             variant="primary"
-            className="w-full h-10"
+            className={clx("w-full h-10", {
+              "pulse-glow": shouldPulsePreorder,
+            })}
             isLoading={isAdding}
             data-testid="add-product-button"
           >
@@ -313,6 +317,7 @@ export default function ProductActions({
             preorderSize={preorderSize}
             setPreorderSize={setPreorderSize}
             preorderSizes={PREORDER_SIZES}
+            pulsePreorder={shouldPulsePreorder}
             handleAddToCart={handleAddToCart}
             isAdding={isAdding}
             show={!inView}

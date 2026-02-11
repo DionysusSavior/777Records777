@@ -18,6 +18,7 @@ type MobileActionsProps = {
   updateOptions: (title: string, value: string) => void
   canBuy: boolean
   isPreorder: boolean
+  pulsePreorder: boolean
   showPreorderSize: boolean
   preorderSizes: readonly string[]
   preorderSize?: string
@@ -35,6 +36,7 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   updateOptions,
   canBuy,
   isPreorder,
+  pulsePreorder,
   showPreorderSize,
   preorderSizes,
   preorderSize,
@@ -137,7 +139,9 @@ const MobileActions: React.FC<MobileActionsProps> = ({
               <Button
                 onClick={handleAddToCart}
                 disabled={!variant || isAdding || !canBuy}
-                className="w-full"
+                className={clx("w-full", {
+                  "pulse-glow": pulsePreorder && isPreorder && canBuy,
+                })}
                 isLoading={isAdding}
                 data-testid="mobile-cart-button"
               >

@@ -83,6 +83,11 @@
     box-shadow: var(--glow);
   }
 
+  .pulse-glow {
+    animation: pulse-glow 2.4s ease-in-out infinite;
+    box-shadow: 0 0 0 rgba(120, 240, 255, 0);
+  }
+
   .content-container {
     @apply max-w-[1440px] w-full mx-auto px-6;
   }
@@ -141,5 +146,17 @@
 
   .text-3xl-semi {
     @apply text-[32px] leading-[44px] font-semibold;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(120, 240, 255, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(120, 240, 255, 0.45),
+      0 0 28px rgba(120, 240, 255, 0.2);
   }
 }
