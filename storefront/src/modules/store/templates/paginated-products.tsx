@@ -21,6 +21,8 @@ export default async function PaginatedProducts({
   categoryId,
   productsIds,
   countryCode,
+  productPreviewTextClassName,
+  productPreviewPriceClassName,
 }: {
   sortBy?: SortOptions
   page: number
@@ -28,6 +30,8 @@ export default async function PaginatedProducts({
   categoryId?: string
   productsIds?: string[]
   countryCode: string
+  productPreviewTextClassName?: string
+  productPreviewPriceClassName?: string
 }) {
   const queryParams: PaginatedProductsParams = {
     limit: 12,
@@ -83,7 +87,12 @@ export default async function PaginatedProducts({
         {products.map((p) => {
           return (
             <li key={p.id}>
-              <ProductPreview product={p} region={region} />
+              <ProductPreview
+                product={p}
+                region={region}
+                textClassName={productPreviewTextClassName}
+                priceClassName={productPreviewPriceClassName}
+              />
             </li>
           )
         })}

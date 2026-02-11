@@ -11,10 +11,14 @@ export default async function ProductPreview({
   product,
   isFeatured,
   region,
+  textClassName = "txt-compact-medium",
+  priceClassName,
 }: {
   product: HttpTypes.StoreProduct
   isFeatured?: boolean
   region: HttpTypes.StoreRegion
+  textClassName?: string
+  priceClassName?: string
 }) {
   if (!product?.handle) {
     return null
@@ -58,7 +62,7 @@ export default async function ProductPreview({
           size={isSound ? "square" : "full"}
           isFeatured={isFeatured}
         />
-        <div className="flex txt-compact-medium mt-4 justify-between">
+        <div className={`flex mt-4 justify-between ${textClassName}`}>
           <Text className="text-ui-fg-subtle" data-testid="product-title">
             {product.title}
           </Text>
@@ -68,7 +72,9 @@ export default async function ProductPreview({
                 Preorder
               </span>
             )}
-            {cheapestPrice && <PreviewPrice price={cheapestPrice} />}
+            {cheapestPrice && (
+              <PreviewPrice price={cheapestPrice} className={priceClassName} />
+            )}
           </div>
         </div>
       </div>

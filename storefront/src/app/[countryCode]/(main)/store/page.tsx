@@ -36,6 +36,8 @@ export default async function StorePage(props: Params) {
       countryCode={params.countryCode}
       productsIds={uniformsProductIds}
       pageTitle="Uniforms"
+      productPreviewTextClassName="txt-compact-small-plus"
+      productPreviewPriceClassName="text-ui-fg-subtle"
     />
   )
 }

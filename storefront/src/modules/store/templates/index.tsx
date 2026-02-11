@@ -12,12 +12,16 @@ const StoreTemplate = ({
   countryCode,
   pageTitle = "All products",
   productsIds,
+  productPreviewTextClassName,
+  productPreviewPriceClassName,
 }: {
   sortBy?: SortOptions
   page?: string
   countryCode: string
   pageTitle?: string
   productsIds?: string[]
+  productPreviewTextClassName?: string
+  productPreviewPriceClassName?: string
 }) => {
   const pageNumber = page ? parseInt(page) : 1
   const sort = sortBy || "created_at"
@@ -38,6 +42,8 @@ const StoreTemplate = ({
             page={pageNumber}
             countryCode={countryCode}
             productsIds={productsIds}
+            productPreviewTextClassName={productPreviewTextClassName}
+            productPreviewPriceClassName={productPreviewPriceClassName}
           />
         </Suspense>
       </div>
