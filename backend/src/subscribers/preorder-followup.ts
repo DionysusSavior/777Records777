@@ -45,7 +45,7 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #05060a;">
       <tr>
         <td align="center" style="padding: 32px 16px;">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" style="width: 600px; max-width: 600px; background: #0b0f1c; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" background="https://777records777.studio/Store_Background_Eagle.png" style="width: 600px; max-width: 600px; background-color: #0b0f1c; background-image: url('https://777records777.studio/Store_Background_Eagle.png'); background-repeat: no-repeat; background-position: center 140px; background-size: 360px auto; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
             <tr>
               <td style="padding: 28px 32px; background: linear-gradient(135deg, rgba(120, 240, 255, 0.14), rgba(120, 120, 255, 0.06)); border-bottom: 1px solid #1b2233;">
                 <div style="font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: #9db4ff;">

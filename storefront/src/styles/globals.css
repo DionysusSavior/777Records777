@@ -17,6 +17,25 @@
       var(--bg-page);
     color: #e7ecff;
     min-height: 100vh;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: url("/Store_Background_Eagle.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: min(70vw, 900px);
+    opacity: 0.1;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body > * {
+    position: relative;
+    z-index: 1;
   }
 }
 
