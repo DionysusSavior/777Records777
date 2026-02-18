@@ -47,7 +47,7 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
         <td align="center" style="padding: 32px 16px;">
           <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" style="width: 600px; max-width: 600px; background-color: #0b0f1c; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
             <tr>
-              <td style="padding: 28px 32px; background: linear-gradient(135deg, rgba(120, 240, 255, 0.14), rgba(120, 120, 255, 0.06)); border-bottom: 1px solid #1b2233;">
+              <td style="padding: 28px 32px; background: linear-gradient(135deg, rgba(120, 240, 255, 0.14), rgba(120, 120, 255, 0.06)); border-bottom: 1px solid #1b2233; text-align: center;">
                 <div style="font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: #9db4ff;">
                   777Records777 Studio
                 </div>
@@ -65,7 +65,7 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
                         src="https://777records777.studio/Store_Background_Eagle.png"
                         alt="777Records777 Eagle"
                         width="72"
-                        style="display: block; width: 72px; height: auto; opacity: 0.08;"
+                        style="display: block; width: 72px; height: auto; opacity: 1;"
                       />
                     </td>
                     <td valign="top">
@@ -91,7 +91,7 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
                         src="https://777records777.studio/Store_Background_Eagle.png"
                         alt="777Records777 Eagle"
                         width="72"
-                        style="display: block; width: 72px; height: auto; opacity: 0.08;"
+                        style="display: block; width: 72px; height: auto; opacity: 1;"
                       />
                     </td>
                   </tr>
