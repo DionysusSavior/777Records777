@@ -11,73 +11,78 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <title>Thank you for your preorder</title>
     <style>
       body {
         margin: 0;
         padding: 0;
-        background-color: #ffffff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        color: #111827;
+        background-color: #05060a;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: #e7ecff;
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
       }
-      .container {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 40px 24px;
+      .glow {
+        text-shadow: 0 0 12px rgba(120, 240, 255, 0.6),
+          0 0 24px rgba(120, 240, 255, 0.35);
       }
-      .logo {
-        margin-bottom: 32px;
-        font-weight: 600;
-        font-size: 18px;
-        letter-spacing: 0.02em;
+      .panel {
+        background: #0b0f1c;
+        border: 1px solid #1b2233;
+        border-radius: 16px;
+        overflow: hidden;
       }
-      h1 {
-        font-size: 22px;
-        font-weight: 500;
-        margin: 0 0 16px 0;
+      .muted {
+        color: #9aa6d8;
       }
-      p {
-        font-size: 15px;
-        line-height: 1.6;
-        margin: 0 0 16px 0;
-        color: #374151;
-      }
-      .divider {
-        height: 1px;
-        background-color: #e5e7eb;
-        margin: 32px 0;
-      }
-      .footer {
-        font-size: 12px;
-        color: #6b7280;
-        line-height: 1.5;
+      .accent {
+        color: #78f0ff;
       }
     </style>
   </head>
-  <body>
-    <div class="container">
-      <div class="logo">777Records777 Studio</div>
-      <h1>Thank you for your preorder</h1>
-      <p>
-        We have received your preorder and wanted to personally thank you for
-        the early support.
-      </p>
-      <p>
-        We are currently finalizing vendor sourcing and production details to
-        ensure quality and consistency before fulfillment begins. Your preorder
-        secures your place in the first production run.
-      </p>
-      <p>
-        We will follow up with updates as sourcing is completed and timelines
-        are confirmed. No action is needed from you in the meantime.
-      </p>
-      <div class="divider"></div>
-      <p class="footer">
-        If you have any questions, simply reply to this email.<br />
-        Thank you again for supporting this release.
-      </p>
-      <p class="footer">-- 777Records777</p>
-    </div>
+  <body style="margin: 0; padding: 0; background-color: #05060a; color: #e7ecff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #05060a;">
+      <tr>
+        <td align="center" style="padding: 32px 16px;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" style="width: 600px; max-width: 600px; background: #0b0f1c; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
+            <tr>
+              <td style="padding: 28px 32px; background: linear-gradient(135deg, rgba(120, 240, 255, 0.14), rgba(120, 120, 255, 0.06)); border-bottom: 1px solid #1b2233;">
+                <div style="font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: #9db4ff;">
+                  777Records777 Studio
+                </div>
+                <div class="glow" style="font-size: 26px; font-weight: 600; margin-top: 8px; color: #f8fbff; text-shadow: 0 0 12px rgba(120, 240, 255, 0.6), 0 0 24px rgba(120, 240, 255, 0.35);">
+                  Thank you for your preorder
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px 32px; font-size: 15px; line-height: 1.6; color: #c9d4ff;">
+                <p style="margin: 0 0 16px 0;">
+                  We have received your preorder and wanted to personally thank you for the early support.
+                </p>
+                <p style="margin: 0 0 16px 0;">
+                  We are currently finalizing vendor sourcing and production details to ensure quality and consistency before fulfillment begins. Your preorder secures your place in the first production run.
+                </p>
+                <p style="margin: 0 0 20px 0;">
+                  We will follow up with updates as sourcing is completed and timelines are confirmed. No action is needed from you in the meantime.
+                </p>
+                <div style="height: 1px; background: linear-gradient(90deg, transparent, rgba(120, 240, 255, 0.5), transparent); margin: 24px 0;"></div>
+                <p style="margin: 0 0 8px 0; font-size: 12px; color: #9aa6d8;">
+                  If you have any questions, simply reply to this email.
+                </p>
+                <p style="margin: 0; font-size: 12px; color: #9aa6d8;">
+                  -- 777Records777
+                </p>
+              </td>
+            </tr>
+          </table>
+          <div style="margin-top: 16px; font-size: 11px; color: #67709a;">
+            Thank you again for supporting this release.
+          </div>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>`
 
