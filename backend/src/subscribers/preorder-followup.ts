@@ -45,7 +45,7 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #05060a;">
       <tr>
         <td align="center" style="padding: 32px 16px;">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" background="https://777records777.studio/Store_Background_Eagle.png" style="width: 600px; max-width: 600px; background-color: #0b0f1c; background-image: url('https://777records777.studio/Store_Background_Eagle.png'); background-repeat: no-repeat; background-position: center 140px; background-size: 360px auto; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="panel" style="width: 600px; max-width: 600px; background-color: #0b0f1c; border: 1px solid #1b2233; border-radius: 16px; overflow: hidden;">
             <tr>
               <td style="padding: 28px 32px; background: linear-gradient(135deg, rgba(120, 240, 255, 0.14), rgba(120, 120, 255, 0.06)); border-bottom: 1px solid #1b2233;">
                 <div style="font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: #9db4ff;">
@@ -58,22 +58,44 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
             </tr>
             <tr>
               <td style="padding: 28px 32px; font-size: 15px; line-height: 1.6; color: #c9d4ff;">
-                <p style="margin: 0 0 16px 0;">
-                  We have received your preorder and wanted to personally thank you for the early support.
-                </p>
-                <p style="margin: 0 0 16px 0;">
-                  We are currently finalizing vendor sourcing and production details to ensure quality and consistency before fulfillment begins. Your preorder secures your place in the first production run.
-                </p>
-                <p style="margin: 0 0 20px 0;">
-                  We will follow up with updates as sourcing is completed and timelines are confirmed. No action is needed from you in the meantime.
-                </p>
-                <div style="height: 1px; background: linear-gradient(90deg, transparent, rgba(120, 240, 255, 0.5), transparent); margin: 24px 0;"></div>
-                <p style="margin: 0 0 8px 0; font-size: 12px; color: #9aa6d8;">
-                  If you have any questions, simply reply to this email.
-                </p>
-                <p style="margin: 0; font-size: 12px; color: #9aa6d8;">
-                  -- 777Records777
-                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td width="72" valign="top" style="padding-right: 12px;">
+                      <img
+                        src="https://777records777.studio/Store_Background_Eagle.png"
+                        alt="777Records777 Eagle"
+                        width="72"
+                        style="display: block; width: 72px; height: auto; opacity: 0.08;"
+                      />
+                    </td>
+                    <td valign="top">
+                      <p style="margin: 0 0 16px 0;">
+                        We have received your preorder and wanted to personally thank you for the early support.
+                      </p>
+                      <p style="margin: 0 0 16px 0;">
+                        We are currently finalizing vendor sourcing and production details to ensure quality and consistency before fulfillment begins. Your preorder secures your place in the first production run.
+                      </p>
+                      <p style="margin: 0 0 20px 0;">
+                        We will follow up with updates as sourcing is completed and timelines are confirmed. No action is needed from you in the meantime.
+                      </p>
+                      <div style="height: 1px; background: linear-gradient(90deg, transparent, rgba(120, 240, 255, 0.5), transparent); margin: 24px 0;"></div>
+                      <p style="margin: 0 0 8px 0; font-size: 12px; color: #9aa6d8;">
+                        If you have any questions, simply reply to this email.
+                      </p>
+                      <p style="margin: 0; font-size: 12px; color: #9aa6d8;">
+                        -- 777Records777
+                      </p>
+                    </td>
+                    <td width="72" valign="top" style="padding-left: 12px;">
+                      <img
+                        src="https://777records777.studio/Store_Background_Eagle.png"
+                        alt="777Records777 Eagle"
+                        width="72"
+                        style="display: block; width: 72px; height: auto; opacity: 0.08;"
+                      />
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
