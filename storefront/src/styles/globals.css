@@ -27,7 +27,7 @@
     background-image: url("/Store_Background_Eagle.png");
     background-repeat: no-repeat;
     background-position: center;
-    background-size: min(70vw, 900px);
+    background-size: min(90vw, 1200px);
     opacity: 0.1;
     pointer-events: none;
     z-index: 0;

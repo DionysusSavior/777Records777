@@ -22,6 +22,16 @@ const Hero = () => {
 
   return (
     <div className="relative min-h-[calc(100vh-96px)] w-full overflow-hidden border-b border-ui-border-base bg-black text-white">
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: "url('/Store_Background_Eagle.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          backgroundSize: "min(90vw, 1200px)",
+          opacity: 0.1,
+        }}
+      />
       <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_#ffffff10,_transparent_45%)]" />
 
       <div className="relative z-10 flex min-h-[calc(100vh-96px)] flex-col items-center justify-center gap-16 px-6 pb-16 pt-8 text-center">
