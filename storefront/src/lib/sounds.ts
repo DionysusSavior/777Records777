@@ -10,6 +10,11 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
     label: "Download Goddess Of Love",
     om7PlayerUrl: "",
   },
+  prod_01KJAM74E83E3PEHKTZNSDEGRV: {
+    url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.wav",
+    label: "Download Gone Crazy",
+    om7PlayerUrl: "",
+  },
 }
 
 export const SOUND_PRODUCT_IDS = Object.keys(SOUND_DOWNLOADS)
