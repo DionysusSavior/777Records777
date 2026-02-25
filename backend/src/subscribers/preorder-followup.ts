@@ -3,7 +3,7 @@ import { Modules } from "@medusajs/framework/utils"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const PREORDER_FROM_EMAIL = process.env.PREORDER_FROM_EMAIL
-const PREORDER_REPLY_TO = process.env.PREORDER_REPLY_TO
+const PREORDER_SUPPORT_EMAIL = "support@777records777.studio"
 
 const PREORDER_EMAIL_SUBJECT = "Thank you for your preorder"
 const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
@@ -120,7 +120,7 @@ const sendPreorderEmail = async (to: string) => {
     to,
     subject: PREORDER_EMAIL_SUBJECT,
     html: PREORDER_EMAIL_HTML,
-    ...(PREORDER_REPLY_TO ? { reply_to: PREORDER_REPLY_TO } : {}),
+    reply_to: PREORDER_SUPPORT_EMAIL,
   }
 
   const response = await fetch("https://api.resend.com/emails", {

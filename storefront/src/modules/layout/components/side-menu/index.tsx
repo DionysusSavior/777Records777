@@ -16,6 +16,7 @@ const SideMenuItems = {
   Uniforms: "/store",
   Sounds: "/sounds",
   Amulets: "/amulets",
+  Support: "/support",
   Account: "/account",
   Cart: "/cart",
 }
