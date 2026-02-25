@@ -114,8 +114,9 @@ const ProductVideoWidget = () => {
     setError(null)
     setSuccess(null)
 
-    const nextImages = videoUrl
-      ? [videoUrl, ...nonVideoImages]
+    const normalizedVideoUrl = videoUrl.trim()
+    const nextImages = normalizedVideoUrl
+      ? [normalizedVideoUrl, ...nonVideoImages]
       : [...nonVideoImages]
 
     try {
@@ -127,7 +128,7 @@ const ProductVideoWidget = () => {
           ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          images: nextImages,
+          images: nextImages.map((url) => ({ url })),
         }),
       })
 
