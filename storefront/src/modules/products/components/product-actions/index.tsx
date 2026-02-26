@@ -263,7 +263,7 @@ export default function ProductActions({
             <Button
               asChild
               variant="primary"
-              className="w-full h-12 sound-download-btn heartbeat-glow"
+              className="w-full h-14 px-8 sound-download-btn heartbeat-glow"
             >
               <a
                 href={soundDownload.url}
@@ -277,7 +277,7 @@ export default function ProductActions({
             <Button
               asChild
               variant="secondary"
-              className="w-full h-12 sound-download-btn heartbeat-glow"
+              className="w-full h-14 px-8 sound-download-btn heartbeat-glow"
             >
               <a href={om7PlayerHref} target="_blank" rel="noreferrer noopener">
                 Download OM7Player

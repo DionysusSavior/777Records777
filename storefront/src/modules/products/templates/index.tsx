@@ -9,7 +9,7 @@ import ProductInfo from "@modules/products/templates/product-info"
 import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-related-products"
 import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
-import { Heading, clx } from "@medusajs/ui"
+import { clx } from "@medusajs/ui"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
 import { isSoundProduct } from "@lib/sounds"
@@ -51,18 +51,9 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
         <div
           className={clx(
             "flex flex-col small:sticky small:top-48 small:py-0 w-full py-8 gap-y-12",
-            soundProduct ? "small:max-w-[430px]" : "small:max-w-[300px]"
+            soundProduct ? "small:max-w-[540px]" : "small:max-w-[300px]"
           )}
         >
-          {soundProduct && (
-            <Heading
-              level="h2"
-              className="luxury-title text-[clamp(1rem,1.55vw,1.75rem)] leading-none text-ui-fg-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
-              data-testid="product-title"
-            >
-              {product.title}
-            </Heading>
-          )}
           {!soundProduct && <ProductOnboardingCta />}
           <Suspense
             fallback={

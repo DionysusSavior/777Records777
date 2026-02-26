@@ -114,13 +114,15 @@
   }
 
   .sound-download-btn {
-    font-size: 1rem;
+    font-family: "Didot", "Bodoni MT", "Bodoni 72", "Times New Roman", serif;
+    font-size: 1.08rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .heartbeat-glow {
-    animation: heartbeat-glow 1.7s ease-in-out infinite;
+    animation: heartbeat-glow 2.6s ease-in-out infinite;
     box-shadow: 0 0 0 rgba(120, 240, 255, 0);
   }
 
