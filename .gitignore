@@ -9,3 +9,4 @@ coverage/
 *.log
 .medusa/
 storefront/public/admin/
+storefront/PRODUCT_UPDATE_REFERENCE.md
