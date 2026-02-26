@@ -31,16 +31,8 @@ export default async function Footer() {
   return (
     <footer className="border-t border-ui-border-base w-full">
       <div className="content-container flex flex-col w-full">
-        <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
-          <div>
-            <LocalizedClientLink
-              href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
-            >
-              777Records777 Studio
-            </LocalizedClientLink>
-          </div>
-          <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
+        <div className="py-32">
+          <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
               <div className="flex flex-col gap-y-2">
                 <span className="txt-small-plus txt-ui-fg-base">
@@ -126,7 +118,6 @@ export default async function Footer() {
               </div>
             )}
             <div className="flex flex-col gap-y-3">
-              <span className="luxury-title text-sm text-ui-fg-base">Connect</span>
               <ul className="grid grid-cols-1 gap-3">
                 {SOCIAL_LINKS.map((link) => (
                   <li key={link.href}>
@@ -136,8 +127,8 @@ export default async function Footer() {
                       rel="noreferrer noopener"
                       className="footer-social-link"
                     >
-                      <span className="footer-social-label">{link.label}</span>
-                      <span className="footer-social-handle">{link.handle}</span>
+                      <span className="footer-social-label holo-text">{link.label}</span>
+                      <span className="footer-social-handle holo-text">{link.handle}</span>
                     </a>
                   </li>
                 ))}
