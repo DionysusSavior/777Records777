@@ -259,7 +259,7 @@ export default function ProductActions({
           </Button>
         )}
         {soundDownload && (
-          <div className="flex flex-col gap-4 pt-2">
+          <div className="flex flex-col gap-6 pt-4">
             <Button
               asChild
               variant="primary"
