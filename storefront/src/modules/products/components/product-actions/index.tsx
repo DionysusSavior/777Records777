@@ -259,7 +259,7 @@ export default function ProductActions({
           </Button>
         )}
         {soundDownload && (
-          <>
+          <div className="flex flex-col gap-4 pt-2">
             <Button
               asChild
               variant="primary"
@@ -283,7 +283,7 @@ export default function ProductActions({
                 Download OM7Player
               </a>
             </Button>
-          </>
+          </div>
         )}
         {/*
         <div className="text-xs opacity-70 break-words">
