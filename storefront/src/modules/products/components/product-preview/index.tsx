@@ -1,4 +1,4 @@
-import { Text } from "@medusajs/ui"
+import { Text, clx } from "@medusajs/ui"
 import { listProducts } from "@lib/data/products"
 import { getProductPrice } from "@lib/util/get-product-price"
 import { HttpTypes } from "@medusajs/types"
@@ -62,8 +62,14 @@ export default async function ProductPreview({
           size={isSound ? "square" : "full"}
           isFeatured={isFeatured}
         />
-        <div className={`flex mt-4 justify-between ${textClassName}`}>
-          <Text className="text-ui-fg-subtle" data-testid="product-title">
+        <div className={`flex mt-4 justify-between gap-x-2 ${textClassName}`}>
+          <Text
+            className={clx("text-ui-fg-subtle min-w-0", {
+              "luxury-title text-[0.86rem] tracking-[0.045em] whitespace-nowrap overflow-hidden text-ellipsis":
+                isSound,
+            })}
+            data-testid="product-title"
+          >
             {product.title}
           </Text>
           <div className="flex items-center gap-x-2">
