@@ -3,7 +3,24 @@ import { listCollections } from "@lib/data/collections"
 import { Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import MedusaCTA from "@modules/layout/components/medusa-cta"
+
+const SOCIAL_LINKS = [
+  {
+    label: "777Records777 Instagram",
+    handle: "@777records777",
+    href: "https://www.instagram.com/777records777/",
+  },
+  {
+    label: "777Records777 Youtube",
+    handle: "@Thehighroseempire",
+    href: "https://www.youtube.com/@Thehighroseempire",
+  },
+  {
+    label: "OM7.foundation Instagram",
+    handle: "@om7.foundation",
+    href: "https://www.instagram.com/om7.foundation",
+  },
+]
 
 export default async function Footer() {
   const { collections } = await listCollections({
@@ -108,39 +125,22 @@ export default async function Footer() {
                 </ul>
               </div>
             )}
-            <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">Medusa</span>
-              <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
-                <li>
-                  <a
-                    href="https://github.com/medusajs"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    GitHub
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://docs.medusajs.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Documentation
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/medusajs/nextjs-starter-medusa"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Source code
-                  </a>
-                </li>
+            <div className="flex flex-col gap-y-3">
+              <span className="luxury-title text-sm text-ui-fg-base">Connect</span>
+              <ul className="grid grid-cols-1 gap-3">
+                {SOCIAL_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <a
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="footer-social-link"
+                    >
+                      <span className="footer-social-label">{link.label}</span>
+                      <span className="footer-social-handle">{link.handle}</span>
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -149,7 +149,6 @@ export default async function Footer() {
           <Text className="txt-compact-small">
             © {new Date().getFullYear()} 777Records777 Studio. All rights reserved.
           </Text>
-          <MedusaCTA />
         </div>
       </div>
     </footer>
