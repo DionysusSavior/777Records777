@@ -1,5 +1,6 @@
 import { getBaseURL } from "@lib/util/env"
 import { Metadata } from "next"
+import Script from "next/script"
 import "styles/globals.css"
 import SplashScreen from "@modules/layout/components/splash-screen"
 import "../styles/animations.css"
@@ -29,6 +30,20 @@ export const metadata: Metadata = {
 export default function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="en" data-mode="dark" className="dark">
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-11321668434"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-11321668434');
+          `}
+        </Script>
+      </head>
       <body className="bg-slate-950 text-slate-100">
         <main className="relative">
           <SplashScreen>{props.children}</SplashScreen>
