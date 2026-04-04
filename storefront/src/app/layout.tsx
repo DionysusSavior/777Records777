@@ -3,6 +3,7 @@ import { Metadata } from "next"
 import Script from "next/script"
 import "styles/globals.css"
 import SplashScreen from "@modules/layout/components/splash-screen"
+import PageViewConversion from "@modules/common/components/page-view-conversion"
 import "../styles/animations.css"
 
 export const metadata: Metadata = {
@@ -72,6 +73,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             style={{ display: "none", visibility: "hidden" }}
           />
         </noscript>
+        <PageViewConversion />
         <main className="relative">
           <SplashScreen>{props.children}</SplashScreen>
         </main>

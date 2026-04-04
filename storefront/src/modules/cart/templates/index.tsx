@@ -2,6 +2,7 @@ import ItemsTemplate from "./items"
 import Summary from "./summary"
 import EmptyCartMessage from "../components/empty-cart-message"
 import SignInPrompt from "../components/sign-in-prompt"
+import AddToCartConversion from "../components/add-to-cart-conversion"
 import { HttpTypes } from "@medusajs/types"
 
 const CartTemplate = ({
@@ -28,6 +29,7 @@ const CartTemplate = ({
 
   return (
     <div className="py-12">
+      <AddToCartConversion />
       <div className="content-container" data-testid="cart-container">
         {hasItems ? (
           <div className={gridClass}>
