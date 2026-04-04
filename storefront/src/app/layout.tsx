@@ -50,6 +50,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             gtag('config', 'AW-11321668434');
           `}
         </Script>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-16881611422"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-tag-2" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-16881611422');
+          `}
+        </Script>
       </head>
       <body className="bg-slate-950 text-slate-100">
         <noscript>
