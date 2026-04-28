@@ -15,6 +15,11 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
     label: "Download Gone Crazy",
     om7PlayerUrl: "",
   },
+  prod_01KQAK7DCK4SFVFGHXSYPHXBB1: {
+    url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New+Deal-+master.wav",
+    label: "Download New Deal",
+    om7PlayerUrl: "",
+  },
 }
 
 export const SOUND_PRODUCT_IDS = Object.keys(SOUND_DOWNLOADS)
