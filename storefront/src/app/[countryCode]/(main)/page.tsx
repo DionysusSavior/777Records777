@@ -1,8 +1,9 @@
 import { Metadata } from "next"
+import { Button, Text } from "@medusajs/ui"
 
 import CategorySection from "@modules/home/components/category-section"
 import { UNIFORM_PRODUCT_IDS } from "@lib/uniforms"
-import { SOUND_PRODUCT_IDS } from "@lib/sounds"
+import { SOUND_PRODUCT_IDS, OM7_PLAYER_URL } from "@lib/sounds"
 
 export const metadata: Metadata = {
   title: "777Records777 Studio",
@@ -41,23 +42,35 @@ export default async function Home(props: {
   return (
     <>
       <CategorySection
-        title="Uniforms"
-        countryCode={countryCode}
-        productsIds={UNIFORM_PRODUCT_IDS}
-        viewAllHref="/store"
-      />
-      <CategorySection
         title="Sounds"
         countryCode={countryCode}
         productsIds={SOUND_PRODUCT_IDS}
         viewAllHref="/sounds"
       />
       <CategorySection
+        title="Uniforms"
+        countryCode={countryCode}
+        productsIds={UNIFORM_PRODUCT_IDS}
+        viewAllHref="/store"
+      />
+      <CategorySection
         title="Amulets"
         countryCode={countryCode}
         productsIds={[]}
         viewAllHref="/amulets"
-      />
+      >
+        <div className="mt-8 flex flex-col items-start gap-3 rounded-2xl border border-black/10 bg-black/[0.02] p-6">
+          <Text className="txt-medium">Get the OM7Player app</Text>
+          <Text className="text-ui-fg-subtle txt-small">
+            Listen to 777Records777 sounds on the go with the OM7Player app.
+          </Text>
+          <Button asChild variant="secondary">
+            <a href={OM7_PLAYER_URL} target="_blank" rel="noreferrer noopener">
+              Download OM7Player
+            </a>
+          </Button>
+        </div>
+      </CategorySection>
     </>
   )
 }

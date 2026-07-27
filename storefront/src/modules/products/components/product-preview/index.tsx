@@ -74,7 +74,7 @@ export default async function ProductPreview({
           </Text>
           <div className="flex items-center gap-x-2">
             {isPreorder && (
-              <span className="inline-flex items-center rounded-full border border-white/20 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-white">
+              <span className="inline-flex items-center rounded-full border border-black/20 bg-black/5 px-2 py-1 text-[10px] uppercase tracking-wide text-black">
                 Preorder
               </span>
             )}

@@ -9,18 +9,18 @@ export default function CheckoutLayout({
 }) {
   return (
     <div className="w-full relative small:min-h-screen">
-      <div className="h-16 border-b border-white/10 bg-[rgba(10,12,20,0.8)] backdrop-blur-xl shadow-[0_0_40px_rgba(120,240,255,0.15)]">
+      <div className="h-16 border-b border-black/10 bg-[rgba(255,255,255,0.85)] backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.06)]">
         <nav className="flex h-full items-center content-container justify-between">
           <LocalizedClientLink
             href="/cart"
-            className="text-small-semi text-white/80 hover:text-white flex items-center gap-x-2 uppercase flex-1 basis-0"
+            className="text-small-semi text-black/80 hover:text-black flex items-center gap-x-2 uppercase flex-1 basis-0"
             data-testid="back-to-cart-link"
           >
             <ChevronDown className="rotate-90" size={16} />
-            <span className="mt-px hidden small:block txt-compact-plus text-white/60 hover:text-white">
+            <span className="mt-px hidden small:block txt-compact-plus text-black/60 hover:text-black">
               Back to shopping cart
             </span>
-            <span className="mt-px block small:hidden txt-compact-plus text-white/60 hover:text-white">
+            <span className="mt-px block small:hidden txt-compact-plus text-black/60 hover:text-black">
               Back
             </span>
           </LocalizedClientLink>

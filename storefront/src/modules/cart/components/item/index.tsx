@@ -179,7 +179,7 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
 
   return (
     <div
-      className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-center md:justify-between"
+      className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-black/5 p-4 md:flex-row md:items-center md:justify-between"
       data-testid="product-row"
     >
       <div className="flex items-center gap-4">
@@ -195,7 +195,7 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
         </LocalizedClientLink>
         <div className="flex flex-col gap-1">
           <Text
-            className="text-base font-semibold text-white"
+            className="text-base font-semibold text-black"
             data-testid="product-title"
           >
             {item.product_title}
@@ -204,19 +204,19 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
             variant={item.variant}
             metadata={item.metadata}
             data-testid="product-variant"
-            className="text-white/60"
+            className="text-black/60"
           />
         </div>
       </div>
       <div className="flex flex-col gap-2 md:items-end">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs uppercase tracking-[0.2em] text-white/60">
+          <span className="text-xs uppercase tracking-[0.2em] text-black/60">
             Qty
           </span>
           <CartItemSelect
             value={item.quantity}
             onChange={(value) => changeQuantity(parseInt(value.target.value))}
-            className="h-10 w-16 border-white/20 bg-white/5 text-white"
+            className="h-10 w-16 border-black/20 bg-black/5 text-black"
             data-testid="product-select-button"
           >
             {/* TODO: Update this with the v2 way of managing inventory */}
@@ -236,7 +236,7 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
             </option>
           </CartItemSelect>
           <DeleteButton id={item.id} data-testid="product-delete-button" />
-          {updating && <Spinner className="text-white/80" />}
+          {updating && <Spinner className="text-black/80" />}
         </div>
         <ErrorMessage error={error} data-testid="product-error-message" />
       </div>

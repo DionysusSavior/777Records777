@@ -16,9 +16,9 @@ export default function SupportPage() {
           <Heading level="h1" className="text-3xl-regular holo-text">
             Support
           </Heading>
-          <Text className="text-base-regular text-white/70">
+          <Text className="text-base-regular text-black/70">
             For any questions or support, email us at{" "}
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-white underline">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-black underline">
               {SUPPORT_EMAIL}
             </a>
             .

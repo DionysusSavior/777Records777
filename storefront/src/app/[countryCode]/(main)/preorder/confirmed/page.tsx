@@ -15,7 +15,7 @@ export default function PreorderConfirmedPage() {
           <Heading level="h1" className="text-3xl-regular holo-text">
             Preorder received
           </Heading>
-          <Text className="text-base-regular text-white/70">
+          <Text className="text-base-regular text-black/70">
             Thanks for your preorder. We will email you when this release is
             ready to ship.
           </Text>
@@ -23,7 +23,7 @@ export default function PreorderConfirmedPage() {
             <LocalizedClientLink href="/">
               <Button
                 variant="transparent"
-                className="h-11 bg-transparent border border-white/30 text-white hover:bg-white/10"
+                className="h-11 bg-transparent border border-black/30 text-black hover:bg-black/10"
               >
                 Continue shopping
               </Button>

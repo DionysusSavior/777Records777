@@ -37,8 +37,8 @@ const Summary = ({ cart }: SummaryProps) => {
         Summary
       </Heading>
       <DiscountCode cart={cart} />
-      <Divider className="border-white/10" />
-      <div className="flex items-center justify-between text-sm uppercase tracking-[0.2em] text-white/60">
+      <Divider className="border-black/10" />
+      <div className="flex items-center justify-between text-sm uppercase tracking-[0.2em] text-black/60">
         <span>Total</span>
         <span
           className="text-base font-semibold holo-text"
@@ -54,7 +54,7 @@ const Summary = ({ cart }: SummaryProps) => {
       >
         <Button
           variant="transparent"
-          className="w-full h-12 bg-transparent border border-white/30 text-white hover:bg-white/10"
+          className="w-full h-12 bg-transparent border border-black/30 text-black hover:bg-black/10"
         >
           <span className="holo-text">Go to checkout</span>
         </Button>

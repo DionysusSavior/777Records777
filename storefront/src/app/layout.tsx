@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout(props: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-mode="dark" className="dark">
+    <html lang="en">
       <head>
         <Script id="gtm" strategy="beforeInteractive">
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -37,7 +37,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-WVRWRWCJ');`}
         </Script>
       </head>
-      <body className="bg-slate-950 text-slate-100">
+      <body className="bg-white text-black">
         <noscript>
           <iframe
             src="https://www.googletagmanager.com/ns.html?id=GTM-WVRWRWCJ"

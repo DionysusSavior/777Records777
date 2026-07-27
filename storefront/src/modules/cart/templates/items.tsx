@@ -61,19 +61,19 @@ const ItemsTemplate = ({
               return (
                 <div
                   key={i}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-2xl border border-black/10 bg-black/5 p-4"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-20 w-20 rounded-xl bg-white/10 animate-pulse" />
+                      <div className="h-20 w-20 rounded-xl bg-black/10 animate-pulse" />
                       <div className="flex flex-col gap-2">
-                        <div className="h-4 w-40 bg-white/10 animate-pulse" />
-                        <div className="h-3 w-28 bg-white/10 animate-pulse" />
+                        <div className="h-4 w-40 bg-black/10 animate-pulse" />
+                        <div className="h-3 w-28 bg-black/10 animate-pulse" />
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-16 rounded-md bg-white/10 animate-pulse" />
-                      <div className="h-4 w-10 rounded-md bg-white/10 animate-pulse" />
+                      <div className="h-10 w-16 rounded-md bg-black/10 animate-pulse" />
+                      <div className="h-4 w-10 rounded-md bg-black/10 animate-pulse" />
                     </div>
                   </div>
                 </div>
@@ -88,7 +88,7 @@ const ItemsTemplate = ({
           >
             <Button
               variant="transparent"
-              className="w-full h-12 bg-transparent border border-white/30 text-white hover:bg-white/10"
+              className="w-full h-12 bg-transparent border border-black/30 text-black hover:bg-black/10"
             >
               <span className="holo-text">Go to checkout</span>
             </Button>

@@ -99,10 +99,10 @@ const CartDropdown = ({
         >
           <PopoverPanel
             static
-            className="hidden small:block absolute top-[calc(100%+1px)] right-0 w-[420px] text-ui-fg-on-color glass-panel rounded-2xl backdrop-blur-2xl"
+            className="hidden small:block absolute top-[calc(100%+1px)] right-0 w-[420px] text-ui-fg-base glass-panel rounded-2xl backdrop-blur-2xl"
             data-testid="nav-cart-dropdown"
           >
-            <div className="p-4 flex items-center justify-center border-b border-white/10">
+            <div className="p-4 flex items-center justify-center border-b border-black/10">
               <h3 className="text-large-semi holo-text">Cart</h3>
             </div>
             {cartState && cartState.items?.length ? (
@@ -175,9 +175,9 @@ const CartDropdown = ({
                       </div>
                     ))}
                 </div>
-                <div className="p-4 flex flex-col gap-y-4 text-small-regular border-t border-white/10">
+                <div className="p-4 flex flex-col gap-y-4 text-small-regular border-t border-black/10">
                   <div className="flex items-center justify-between">
-                    <span className="text-ui-fg-on-color font-semibold">
+                    <span className="text-ui-fg-base font-semibold">
                       Subtotal{" "}
                       <span className="font-normal">(excl. taxes)</span>
                     </span>
@@ -206,10 +206,10 @@ const CartDropdown = ({
             ) : (
               <div>
                 <div className="flex py-16 flex-col gap-y-4 items-center justify-center">
-                  <div className="bg-white/10 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
+                  <div className="bg-black/10 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-black">
                     <span>0</span>
                   </div>
-                  <span className="text-ui-fg-on-color">
+                  <span className="text-ui-fg-base">
                     Your shopping bag is empty.
                   </span>
                   <div>

@@ -9,14 +9,14 @@ const CheckoutSummary = ({ cart }: { cart: any }) => {
   return (
     <div className="sticky top-0 flex flex-col-reverse small:flex-col gap-y-8 py-8 small:py-0 ">
       <div className="glass-panel rounded-3xl px-6 py-8 flex flex-col gap-y-6">
-        <Divider className="my-6 small:hidden border-white/10" />
+        <Divider className="my-6 small:hidden border-black/10" />
         <Heading
           level="h2"
           className="flex flex-row text-3xl-regular items-baseline holo-text"
         >
           In your Cart
         </Heading>
-        <Divider className="my-6 border-white/10" />
+        <Divider className="my-6 border-black/10" />
         <CartTotals totals={cart} />
         <ItemsPreviewTemplate cart={cart} />
         <div className="my-6">

@@ -8,7 +8,7 @@ const SignInPrompt = () => {
         <Heading level="h2" className="txt-xlarge holo-text">
           Already have an account?
         </Heading>
-        <Text className="txt-medium text-white/70 mt-2">
+        <Text className="txt-medium text-black/70 mt-2">
           Sign in for a better experience.
         </Text>
       </div>
@@ -16,7 +16,7 @@ const SignInPrompt = () => {
         <LocalizedClientLink href="/account">
           <Button
             variant="transparent"
-            className="h-10 bg-transparent border border-white/30 text-white hover:bg-white/10"
+            className="h-10 bg-transparent border border-black/30 text-black hover:bg-black/10"
             data-testid="sign-in-button"
           >
             Sign in

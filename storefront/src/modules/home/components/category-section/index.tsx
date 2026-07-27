@@ -10,11 +10,13 @@ export default async function CategorySection({
   countryCode,
   productsIds,
   viewAllHref,
+  children,
 }: {
   title: string
   countryCode: string
   productsIds: string[]
   viewAllHref: string
+  children?: React.ReactNode
 }) {
   const region = await getRegion(countryCode)
 
@@ -63,6 +65,7 @@ export default async function CategorySection({
       ) : (
         <Text className="text-ui-fg-subtle">Coming soon.</Text>
       )}
+      {children}
     </section>
   )
 }

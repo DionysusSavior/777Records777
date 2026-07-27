@@ -17,8 +17,8 @@ export default async function Nav() {
 
   return (
     <div className="sticky top-0 inset-x-0 z-50 group">
-      <header className="relative h-16 mx-auto border-b border-transparent duration-200 bg-[rgba(10,12,20,0.8)] backdrop-blur-xl shadow-[0_0_40px_rgba(120,240,255,0.15)]">
-        <nav className="content-container txt-xsmall-plus flex items-center justify-between w-full h-full text-small-regular text-slate-100">
+      <header className="relative h-16 mx-auto border-b border-black/10 duration-200 bg-[rgba(255,255,255,0.85)] backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.06)]">
+        <nav className="content-container txt-xsmall-plus flex items-center justify-between w-full h-full text-small-regular text-slate-900">
           <div className="flex-1 basis-0 h-full flex items-center">
             <div className="h-full">
               <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} />

@@ -24,6 +24,9 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
 
 export const SOUND_PRODUCT_IDS = Object.keys(SOUND_DOWNLOADS)
 
+export const OM7_PLAYER_URL =
+  "https://apps.apple.com/us/app/om7player/id6755060481"
+
 export const getSoundDownload = (product: {
   id?: string
   metadata?: Record<string, unknown> | null

@@ -20,10 +20,10 @@ const Register = ({ setCurrentView }: Props) => {
       className="max-w-sm flex flex-col items-center"
       data-testid="register-page"
     >
-      <h1 className="text-large-semi uppercase mb-6 text-white">
+      <h1 className="text-large-semi uppercase mb-6 text-black">
         Become a 777Records777 Studio Member
       </h1>
-      <p className="text-center text-base-regular text-white/70 mb-4">
+      <p className="text-center text-base-regular text-black/70 mb-4">
         Create your 777Records777 Studio Member profile, and get access to an
         enhanced shopping experience.
       </p>
@@ -68,18 +68,18 @@ const Register = ({ setCurrentView }: Props) => {
           />
         </div>
         <ErrorMessage error={message} data-testid="register-error" />
-        <span className="text-center text-white/70 text-small-regular mt-6">
+        <span className="text-center text-black/70 text-small-regular mt-6">
           By creating an account, you agree to 777Records777 Studio&apos;s{" "}
           <LocalizedClientLink
             href="/content/privacy-policy"
-            className="underline text-white"
+            className="underline text-black"
           >
             Privacy Policy
           </LocalizedClientLink>{" "}
           and{" "}
           <LocalizedClientLink
             href="/content/terms-of-use"
-            className="underline text-white"
+            className="underline text-black"
           >
             Terms of Use
           </LocalizedClientLink>
@@ -89,11 +89,11 @@ const Register = ({ setCurrentView }: Props) => {
           Join
         </SubmitButton>
       </form>
-      <span className="text-center text-white/70 text-small-regular mt-6">
+      <span className="text-center text-black/70 text-small-regular mt-6">
         Already a member?{" "}
         <button
           onClick={() => setCurrentView(LOGIN_VIEW.SIGN_IN)}
-          className="underline text-white"
+          className="underline text-black"
         >
           Sign in
         </button>

@@ -251,7 +251,7 @@ const Payment = ({
           ) : null}
         </div>
       </div>
-      <Divider className="mt-8 border-white/10" />
+      <Divider className="mt-8 border-black/10" />
     </div>
   )
 }
