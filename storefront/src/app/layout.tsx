@@ -2,8 +2,6 @@ import { getBaseURL } from "@lib/util/env"
 import { Metadata } from "next"
 import Script from "next/script"
 import "styles/globals.css"
-import SplashScreen from "@modules/layout/components/splash-screen"
-import "../styles/animations.css"
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
@@ -48,9 +46,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             style={{ display: "none", visibility: "hidden" }}
           />
         </noscript>
-        <main className="relative">
-          <SplashScreen>{props.children}</SplashScreen>
-        </main>
+        <main className="relative">{props.children}</main>
       </body>
     </html>
   )

@@ -1,0 +1,4 @@
+export const UNIFORM_PRODUCT_IDS = [
+  "prod_01KECR7W439TW1VQBTP0QGY4EF", // White BAMN tee
+  "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
+]

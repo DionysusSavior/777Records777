@@ -2,6 +2,7 @@ import { Metadata } from "next"
 
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import StoreTemplate from "@modules/store/templates"
+import { UNIFORM_PRODUCT_IDS } from "@lib/uniforms"
 
 export const metadata: Metadata = {
   title: "Uniforms",
@@ -23,18 +24,12 @@ export default async function StorePage(props: Params) {
   const searchParams = await props.searchParams;
   const { sortBy, page } = searchParams
 
-  const uniformsProductIds = [
-    "prod_01KECR7W439TW1VQBTP0QGY4EF", // White BAMN tee
-    "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
-  ]
-
-  // Default store page currently shows everything; adjust productsIds to filter if needed.
   return (
     <StoreTemplate
       sortBy={sortBy}
       page={page}
       countryCode={params.countryCode}
-      productsIds={uniformsProductIds}
+      productsIds={UNIFORM_PRODUCT_IDS}
       pageTitle="Uniforms"
       productPreviewTextClassName="txt-compact-small-plus"
       productPreviewPriceClassName="text-ui-fg-subtle"

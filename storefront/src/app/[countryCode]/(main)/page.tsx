@@ -1,12 +1,8 @@
 import { Metadata } from "next"
 
-import FeaturedProducts from "@modules/home/components/featured-products"
-import Hero from "@modules/home/components/hero"
-import { listCollections } from "@lib/data/collections"
-import { getRegion } from "@lib/data/regions"
-
-// Debug backend URL during build/runtime
-console.log("MEDUSA", process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL)
+import CategorySection from "@modules/home/components/category-section"
+import { UNIFORM_PRODUCT_IDS } from "@lib/uniforms"
+import { SOUND_PRODUCT_IDS } from "@lib/sounds"
 
 export const metadata: Metadata = {
   title: "777Records777 Studio",
@@ -42,24 +38,26 @@ export default async function Home(props: {
 
   const { countryCode } = params
 
-  const region = await getRegion(countryCode)
-
-  const { collections } = await listCollections({
-    fields: "id, handle, title",
-  })
-
-  if (!collections || !region) {
-    return null
-  }
-
   return (
     <>
-      <Hero />
-      <div className="py-12">
-        <ul className="flex flex-col gap-x-6">
-          <FeaturedProducts collections={collections} region={region} />
-        </ul>
-      </div>
+      <CategorySection
+        title="Uniforms"
+        countryCode={countryCode}
+        productsIds={UNIFORM_PRODUCT_IDS}
+        viewAllHref="/store"
+      />
+      <CategorySection
+        title="Sounds"
+        countryCode={countryCode}
+        productsIds={SOUND_PRODUCT_IDS}
+        viewAllHref="/sounds"
+      />
+      <CategorySection
+        title="Amulets"
+        countryCode={countryCode}
+        productsIds={[]}
+        viewAllHref="/amulets"
+      />
     </>
   )
 }
