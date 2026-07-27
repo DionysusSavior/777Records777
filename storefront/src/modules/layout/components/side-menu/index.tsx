@@ -71,7 +71,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                   >
                     <div className="flex justify-end" id="xmark">
                       <button data-testid="close-menu-button" onClick={close}>
-                        <XMark className="text-slate-900" />
+                        <XMark className="text-stone-900" />
                       </button>
                     </div>
                     <ul className="flex flex-col gap-6 items-start justify-start">

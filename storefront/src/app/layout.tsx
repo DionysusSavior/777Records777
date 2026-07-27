@@ -37,7 +37,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-WVRWRWCJ');`}
         </Script>
       </head>
-      <body className="bg-white text-black">
+      <body className="bg-stone-50 text-stone-900">
         <noscript>
           <iframe
             src="https://www.googletagmanager.com/ns.html?id=GTM-WVRWRWCJ"
