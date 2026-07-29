@@ -11,6 +11,7 @@ type ThumbnailProps = {
   size?: "small" | "medium" | "large" | "full" | "square"
   isFeatured?: boolean
   className?: string
+  mediaClassName?: string
   "data-testid"?: string
 }
 
@@ -20,6 +21,7 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
   size = "small",
   isFeatured,
   className,
+  mediaClassName,
   "data-testid": dataTestid,
 }) => {
   const mediaCandidates = [
@@ -45,7 +47,11 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
       )}
       data-testid={dataTestid}
     >
-      <MediaOrPlaceholder mediaUrl={mediaUrl} size={size} />
+      <MediaOrPlaceholder
+        mediaUrl={mediaUrl}
+        size={size}
+        mediaClassName={mediaClassName}
+      />
     </Container>
   )
 }
@@ -72,12 +78,16 @@ const shouldBypassOptimization = (url?: string) => {
 const MediaOrPlaceholder = ({
   mediaUrl,
   size,
-}: Pick<ThumbnailProps, "size"> & { mediaUrl?: string }) => {
+  mediaClassName,
+}: Pick<ThumbnailProps, "size" | "mediaClassName"> & { mediaUrl?: string }) => {
   if (mediaUrl && isVideoUrl(mediaUrl)) {
     return (
       <video
         src={mediaUrl}
-        className="absolute inset-0 h-full w-full object-cover object-center rounded-medium"
+        className={clx(
+          "absolute inset-0 h-full w-full object-cover object-center rounded-medium",
+          mediaClassName
+        )}
         muted
         loop
         playsInline
@@ -94,7 +104,7 @@ const MediaOrPlaceholder = ({
       <Image
         src={mediaUrl}
         alt="Thumbnail"
-        className="absolute inset-0 object-cover object-center"
+        className={clx("absolute inset-0 object-cover object-center", mediaClassName)}
         draggable={false}
         quality={50}
         sizes="(max-width: 576px) 280px, (max-width: 768px) 360px, (max-width: 992px) 480px, 800px"

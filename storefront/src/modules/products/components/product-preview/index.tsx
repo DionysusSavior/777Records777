@@ -5,7 +5,7 @@ import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "../thumbnail"
 import PreviewPrice from "./price"
-import { isSoundProduct } from "@lib/sounds"
+import { isSoundProduct, getArtworkRotationClassName } from "@lib/sounds"
 
 export default async function ProductPreview({
   product,
@@ -61,6 +61,7 @@ export default async function ProductPreview({
           images={preferredImages}
           size={isSound ? "square" : "full"}
           isFeatured={isFeatured}
+          mediaClassName={getArtworkRotationClassName(product)}
         />
         <div className={`flex mt-4 justify-between gap-x-2 ${textClassName}`}>
           <Text

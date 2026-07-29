@@ -56,3 +56,13 @@ export const isSoundProduct = (product: {
   id?: string
   metadata?: Record<string, unknown> | null
 }) => Boolean(getSoundDownload(product))
+
+const ROTATE_LEFT_90_PRODUCT_IDS = new Set([
+  "prod_01KG8CPWZ9T008217JZYTM3EKW", // Goddess of Love
+  "prod_01KJAM74E83E3PEHKTZNSDEGRV", // Gone Crazy
+])
+
+export const getArtworkRotationClassName = (product: { id?: string }) =>
+  product.id && ROTATE_LEFT_90_PRODUCT_IDS.has(product.id)
+    ? "-rotate-90"
+    : undefined
