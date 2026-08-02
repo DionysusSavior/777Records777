@@ -23,6 +23,15 @@ export type Artist = {
    * as a portrait and needs the crop pinned to a face.
    */
   focus: string
+  /**
+   * The colour of the light the panel appears to cast on the page under it.
+   *
+   * Taken from the photograph rather than picked, so the glow reads as spill
+   * from the image and not as a coloured box behind it. This is what makes the
+   * panel look lifted: on a near-black page a black drop shadow is invisible,
+   * so the only thing that can suggest height is light.
+   */
+  glow: string
   soundIds: string[]
   uniformIds: string[]
   amuletIds: string[]
@@ -49,6 +58,7 @@ export const ARTISTS: Artist[] = [
     tagline: "Sounds, uniforms, amulets",
     photo: "/artists/dionysus-savior.webp",
     focus: "50% 50%",
+    glow: "rgba(214, 34, 46, 0.42)",
     // Credits taken from the product titles in Medusa, not guessed.
     soundIds: [
       "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
@@ -63,6 +73,9 @@ export const ARTISTS: Artist[] = [
     tagline: "Sounds, uniforms, amulets",
     photo: "/artists/viz.webp",
     focus: "50% 50%",
+    // Cool and dim to match a photograph that is almost entirely shadow. A
+    // warm glow here would look pasted on.
+    glow: "rgba(148, 163, 184, 0.30)",
     soundIds: [
       "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
       ...LABEL_SOUNDS,
