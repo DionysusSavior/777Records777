@@ -73,9 +73,13 @@ export default function ScrollRail({
       </motion.div>
 
       {/* The row runs off both edges rather than ending in a wall, so it reads
-          as continuing rather than as a box that happens to be too small. */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-[var(--bg-page)] to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[var(--bg-page)] to-transparent" />
+          as continuing rather than as a box that happens to be too small.
+
+          Pulled out into the container's gutter rather than sitting over the
+          row: at w-10 from the edge these covered the first card's title,
+          which read as a rendering fault rather than as a fade. */}
+      <div className="pointer-events-none absolute inset-y-0 -left-6 w-6 bg-gradient-to-r from-[var(--bg-page)] to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 -right-6 w-6 bg-gradient-to-l from-[var(--bg-page)] to-transparent" />
     </div>
   )
 }
