@@ -11,9 +11,11 @@ type Props = {
   params: Promise<{ countryCode: string; handle: string }>
 }
 
-export async function generateStaticParams() {
-  return ARTISTS.map((a) => ({ handle: a.handle }))
-}
+// No generateStaticParams here, deliberately. Listing the handles marks the
+// route as statically generated, and the shelves below resolve the region from
+// the request cookie, which a static render is not allowed to read. The whole
+// page then fails with DYNAMIC_SERVER_USAGE. It renders per request like every
+// other route in this app.
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { handle } = await props.params
