@@ -25,9 +25,18 @@ export const metadata: Metadata = {
   },
 }
 
+/**
+ * `dark` on <html> flips the @medusajs/ui colour tokens. Without it every
+ * component styled with text-ui-fg-* or border-ui-border-* keeps its
+ * light-theme value and vanishes against the black page.
+ *
+ * <body> carries no colour classes on purpose: a utility class there beats the
+ * `background` rule in globals.css, which is how the page stayed off-white
+ * after the theme was switched to black.
+ */
 export default function RootLayout(props: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <Script id="gtm" strategy="beforeInteractive">
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -37,7 +46,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-WVRWRWCJ');`}
         </Script>
       </head>
-      <body className="bg-stone-50 text-stone-900">
+      <body>
         <noscript>
           <iframe
             src="https://www.googletagmanager.com/ns.html?id=GTM-WVRWRWCJ"
