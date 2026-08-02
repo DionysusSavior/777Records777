@@ -4,15 +4,15 @@
 
 @layer base {
   :root {
-    --bg-page: #faf9f6;
-    --panel: rgba(255, 255, 255, 0.9);
-    --border: rgba(0, 0, 0, 0.08);
-    --glow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    --bg-page: #050505;
+    --panel: rgba(255, 255, 255, 0.04);
+    --border: rgba(255, 255, 255, 0.10);
+    --glow: 0 8px 30px rgba(0, 0, 0, 0.55);
   }
 
   body {
     background: var(--bg-page);
-    color: #1c1917;
+    color: #f5f5f4;
     min-height: 100vh;
     position: relative;
   }
@@ -25,8 +25,10 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: min(90vw, 1200px);
-    filter: invert(1);
-    opacity: 0.05;
+    /* The mark is dark artwork, so it is inverted to white and sits low
+       against the black rather than fighting the products in front of it. */
+    filter: invert(1) brightness(1.6);
+    opacity: 0.08;
     pointer-events: none;
     z-index: 0;
   }

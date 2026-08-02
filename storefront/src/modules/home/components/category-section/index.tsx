@@ -4,6 +4,7 @@ import { listProductsWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import InteractiveLink from "@modules/common/components/interactive-link"
 import ProductPreview from "@modules/products/components/product-preview"
+import ScrollRail from "@modules/common/components/scroll-rail"
 
 export default async function CategorySection({
   title,
@@ -52,16 +53,14 @@ export default async function CategorySection({
         <InteractiveLink href={viewAllHref}>View all</InteractiveLink>
       </div>
       {products.length > 0 ? (
-        <ul
-          className="grid grid-cols-2 small:grid-cols-3 medium:grid-cols-4 gap-x-6 gap-y-8"
-          data-testid="products-list"
-        >
+        // A rail rather than a grid: a record label's shelf reads as something
+        // you move along, and it keeps every section the same height however
+        // many products are in it.
+        <ScrollRail>
           {products.map((product) => (
-            <li key={product.id}>
-              <ProductPreview product={product} region={region} />
-            </li>
+            <ProductPreview key={product.id} product={product} region={region} />
           ))}
-        </ul>
+        </ScrollRail>
       ) : (
         <Text className="text-ui-fg-subtle">Coming soon.</Text>
       )}
