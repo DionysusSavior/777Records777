@@ -32,6 +32,14 @@ export type Artist = {
    * so the only thing that can suggest height is light.
    */
   glow: string
+  /**
+   * Where a feature enquiry for this artist lands.
+   *
+   * On the artist rather than in one shared inbox, because a booking is a
+   * conversation with a person and routing it centrally would mean somebody
+   * forwarding mail by hand forever.
+   */
+  bookingEmail: string
   soundIds: string[]
   uniformIds: string[]
   amuletIds: string[]
@@ -59,6 +67,7 @@ export const ARTISTS: Artist[] = [
     photo: "/artists/dionysus-savior.webp",
     focus: "50% 50%",
     glow: "rgba(214, 34, 46, 0.42)",
+    bookingEmail: "dionysussavior@outlook.com",
     // Credits taken from the product titles in Medusa, not guessed.
     soundIds: [
       "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
@@ -76,6 +85,7 @@ export const ARTISTS: Artist[] = [
     // Cool and dim to match a photograph that is almost entirely shadow. A
     // warm glow here would look pasted on.
     glow: "rgba(148, 163, 184, 0.30)",
+    bookingEmail: "vizisreal@gmail.com",
     soundIds: [
       "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
       ...LABEL_SOUNDS,

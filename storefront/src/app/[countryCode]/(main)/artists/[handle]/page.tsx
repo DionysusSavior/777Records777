@@ -1,11 +1,12 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { Button, Text } from "@medusajs/ui"
 
 import ArtistHero from "@modules/artists/components/artist-hero"
-import CategorySection from "@modules/home/components/category-section"
-import { ARTISTS, getArtist } from "@lib/artists"
-import { OM7_PLAYER_URL } from "@lib/sounds"
+import SoundShelf from "@modules/artists/components/sound-shelf"
+import UniformShelf from "@modules/artists/components/uniform-shelf"
+import FeatureRequest from "@modules/artists/components/feature-request"
+import Om7PlayerSection from "@modules/artists/components/om7player-section"
+import { getArtist } from "@lib/artists"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
@@ -20,24 +21,36 @@ type Props = {
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { handle } = await props.params
   const artist = getArtist(handle)
-
-  if (!artist) {
-    return { title: "777Records777 Studio" }
-  }
-
+  if (!artist) return { title: "777Records777 Studio" }
   return {
     title: `${artist.name} | 777Records777 Studio`,
     description: `${artist.name} — ${artist.tagline}.`,
   }
 }
 
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string
+  note?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="content-container border-t border-white/10 py-12 small:py-20">
+      <h2 className="text-2xl font-bold text-white small:text-3xl">{title}</h2>
+      {note && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/50">{note}</p>}
+      <div className="mt-8">{children}</div>
+    </section>
+  )
+}
+
 /**
- * One artist, three shelves.
+ * One artist, one page. Nothing here sends you somewhere else to finish.
  *
- * The sections are the same three the home page used to carry; the only thing
- * that changed is that each one is now filtered to this artist's ids. A shelf
- * with nothing on it still renders — "Coming soon" is a truer answer than a
- * missing section, which just looks like the page failed to load.
+ * The order is a sequence, not a menu: hear it, wear it, book it, then take it
+ * with you. The app is last because it is the only link that leaves the site.
  */
 export default async function ArtistPage(props: Props) {
   const { countryCode, handle } = await props.params
@@ -51,38 +64,24 @@ export default async function ArtistPage(props: Props) {
     <>
       <ArtistHero artist={artist} />
 
-      <CategorySection
-        title="Sounds"
-        countryCode={countryCode}
-        productsIds={artist.soundIds}
-        viewAllHref="/sounds"
+      <Section title="Sounds" note="Free to download. The files are yours once you have them.">
+        <SoundShelf countryCode={countryCode} productIds={artist.soundIds} />
+      </Section>
+
+      <Section title="Uniforms">
+        <UniformShelf countryCode={countryCode} productIds={artist.uniformIds} />
+      </Section>
+
+      <Section
+        title="Feature price"
+        note={`A verse is $500, the same wherever it is recorded. A video appearance depends on where it is and what the travel costs, so tell ${artist.name} where and it comes back with a number.`}
       >
-        <div className="mt-8 flex flex-col items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <Text className="txt-medium">Get the OM7Player app</Text>
-          <Text className="text-ui-fg-subtle txt-small">
-            Listen to 777Records777 sounds on the go with the OM7Player app.
-          </Text>
-          <Button asChild variant="secondary">
-            <a href={OM7_PLAYER_URL} target="_blank" rel="noreferrer noopener">
-              Download OM7Player
-            </a>
-          </Button>
-        </div>
-      </CategorySection>
+        <FeatureRequest artistHandle={artist.handle} artistName={artist.name} />
+      </Section>
 
-      <CategorySection
-        title="Uniforms"
-        countryCode={countryCode}
-        productsIds={artist.uniformIds}
-        viewAllHref="/store"
-      />
-
-      <CategorySection
-        title="Amulets"
-        countryCode={countryCode}
-        productsIds={artist.amuletIds}
-        viewAllHref="/amulets"
-      />
+      <Section title="OM7Player" note="Your library, on your phone. No account, no upload, no stream.">
+        <Om7PlayerSection />
+      </Section>
     </>
   )
 }
