@@ -35,6 +35,13 @@ const LABEL_UNIFORMS = [
   "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
 ]
 
+// Credited to the label rather than to either artist, so it sits on both
+// shelves. Filing it under one of them would be a guess, and leaving it off
+// both would hide the release entirely.
+const LABEL_SOUNDS = [
+  "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
+]
+
 export const ARTISTS: Artist[] = [
   {
     handle: "dionysus-savior",
@@ -42,12 +49,10 @@ export const ARTISTS: Artist[] = [
     tagline: "Sounds, uniforms, amulets",
     photo: "/artists/dionysus-savior.webp",
     focus: "50% 50%",
-    // Every release currently in the catalogue is filed here. Move an id down
-    // to Viz's list to re-credit it; nothing else needs to change.
+    // Credits taken from the product titles in Medusa, not guessed.
     soundIds: [
-      "prod_01KG8CPWZ9T008217JZYTM3EKW", // Goddess of Love (feat. Kap G)
-      "prod_01KJAM74E83E3PEHKTZNSDEGRV", // Gone Crazy
-      "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // New Deal
+      "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
+      ...LABEL_SOUNDS,
     ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
@@ -58,7 +63,10 @@ export const ARTISTS: Artist[] = [
     tagline: "Sounds, uniforms, amulets",
     photo: "/artists/viz.webp",
     focus: "50% 50%",
-    soundIds: [],
+    soundIds: [
+      "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
+      ...LABEL_SOUNDS,
+    ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
   },
