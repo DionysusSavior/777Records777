@@ -17,9 +17,9 @@
   "dependencies": {
     "@babel/core": "^7.17.5",
     "@headlessui/react": "^2.2.0",
-    "@medusajs/js-sdk": "latest",
-    "@medusajs/types": "latest",
-    "@medusajs/ui": "latest",
+    "@medusajs/js-sdk": "2.12.4",
+    "@medusajs/types": "2.12.4",
+    "@medusajs/ui": "4.0.31",
     "@medusajs/ui-preset": "^2.12.4",
     "@radix-ui/react-accordion": "^1.2.1",
     "@stripe/react-stripe-js": "^5.3.0",
