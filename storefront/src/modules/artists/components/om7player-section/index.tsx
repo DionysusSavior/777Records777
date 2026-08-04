@@ -32,11 +32,16 @@ export default function Om7PlayerSection() {
             key={shot.src}
             className="relative aspect-[1320/2868] w-[62vw] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-black small:w-[236px]"
           >
+            {/* unoptimized: these are stored at exactly the width they are
+                shown at, so there is nothing for the optimizer to do. Asking
+                it to produce a 3840px version of a screenshot is what made
+                every one of these panels fail to load. */}
             <Image
               src={shot.src}
               alt={shot.alt}
               fill
               sizes="(min-width: 1024px) 236px, 62vw"
+              unoptimized
               className="object-cover"
             />
           </div>

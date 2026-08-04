@@ -1,20 +1,25 @@
-import Image from "next/image"
-
 import { listProductsWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getSoundDownload, getArtworkRotationClassName } from "@lib/sounds"
+import ScrollRail from "@modules/common/components/scroll-rail"
+import Thumbnail from "@modules/products/components/thumbnail"
 
 /**
- * The releases, with the file itself one click away.
+ * The releases, as playing panels, with the file one click away.
  *
- * There used to be a product page between a visitor and the download. That
- * page existed to sell a decision nobody has to make here: the tracks are
- * free, so a step that only asks "are you sure" is a step that loses people.
+ * The artwork on these is not artwork: every sound's only media is a lyric
+ * video, and Thumbnail plays it muted on a loop. That is what makes the row
+ * feel alive, and it is the whole reason to use Thumbnail here rather than an
+ * Image. Reaching for next/image directly is what broke it — the optimizer was
+ * handed a .mov, could not make a picture of it, and every panel went blank.
  *
- * The download sits on the right, apart from the artwork and with its own
- * space, because it is the one irreversible-feeling thing in the row and it
- * should never be the thing a thumb lands on by accident.
+ * There is no link to a product page. The tracks are free, so a page that only
+ * asks "are you sure" is a step that loses people; the download does the work
+ * from here.
  */
+const isVideo = (url?: string | null) =>
+  !!url && /\.(mp4|mov|webm|ogg)$/i.test((url.split("?")[0] as string) || "")
+
 export default async function SoundShelf({
   countryCode,
   productIds,
@@ -41,52 +46,53 @@ export default async function SoundShelf({
   }
 
   return (
-    <ul className="flex flex-col gap-4">
+    <ScrollRail>
       {products.map((product) => {
         const download = getSoundDownload(product)
-        const art = product.thumbnail ?? product.images?.[0]?.url ?? null
+
+        // Stills win when a release has them; the video is the fallback, which
+        // for these is all there is. Same preference the product grid uses.
+        const stills = product.images?.filter((img) => !isVideo(img.url)) ?? []
+        const videos = product.images?.filter((img) => isVideo(img.url)) ?? []
+        const preferred = stills.length > 0 ? stills : videos
 
         return (
-          <li
-            key={product.id}
-            className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 small:flex-row small:items-center small:gap-6 small:p-5"
-          >
-            <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-xl bg-black/60 small:w-28">
-              {art && (
-                <Image
-                  src={art}
-                  alt={product.title}
-                  fill
-                  sizes="(min-width: 1024px) 112px, 100vw"
-                  className={`object-cover ${getArtworkRotationClassName(product)}`}
-                />
+          <div key={product.id} data-testid="sound-wrapper">
+            <Thumbnail
+              thumbnail={product.thumbnail}
+              images={preferred}
+              size="square"
+              isFeatured
+              mediaClassName={getArtworkRotationClassName(product)}
+            />
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
+                {product.title}
+              </span>
+
+              {download && (
+                <a
+                  href={download.url}
+                  download
+                  aria-label={`Download ${product.title}`}
+                  // Beside the title rather than over the artwork: the panel is
+                  // playing, and a button on top of it competes with the thing
+                  // it is meant to be selling.
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  Download
+                </a>
               )}
             </div>
-
-            <div className="min-w-0 flex-1">
-              <h3 className="luxury-title truncate text-[1.05rem] tracking-[0.045em] text-white">{product.title}</h3>
-              <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">Free download</p>
-            </div>
-
-            {download && (
-              <a
-                href={download.url}
-                download
-                // Far from the artwork and full width only once it has a row to
-                // itself, so a mistap on a phone hits nothing.
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-[12px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-white/90 small:ml-6"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M12 3v12" />
-                  <path d="m7 10 5 5 5-5" />
-                  <path d="M5 21h14" />
-                </svg>
-                Download
-              </a>
-            )}
-          </li>
+          </div>
         )
       })}
-    </ul>
+    </ScrollRail>
   )
 }

@@ -1,9 +1,8 @@
-import Image from "next/image"
-
 import { listProductsWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import ProductActions from "@modules/products/components/product-actions"
 import ProductTabs from "@modules/products/components/product-tabs"
+import Thumbnail from "@modules/products/components/thumbnail"
 
 /**
  * The merch, bought where it is seen.
@@ -46,24 +45,17 @@ export default async function UniformShelf({
   return (
     <div className="flex flex-col gap-10">
       {products.map((product) => {
-        const art = product.thumbnail ?? product.images?.[0]?.url ?? null
-
         return (
           <div
             key={product.id}
             className="grid grid-cols-1 gap-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 small:grid-cols-2 small:gap-10 small:p-6"
           >
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/60">
-              {art && (
-                <Image
-                  src={art}
-                  alt={product.title}
-                  fill
-                  sizes="(min-width: 1024px) 45vw, 100vw"
-                  className="object-cover"
-                />
-              )}
-            </div>
+            {/* Thumbnail rather than an Image: it gathers the thumbnail and
+                every image, prefers whichever exists, and falls back to a
+                placeholder. Selecting the media by hand is what made these
+                shirts render as a price with nothing above it — the fields
+                came back empty and the guard drew nothing at all. */}
+            <Thumbnail thumbnail={product.thumbnail} images={product.images} size="square" isFeatured />
 
             <div className="flex flex-col">
               <h3 className="text-xl font-bold text-white">{product.title}</h3>
