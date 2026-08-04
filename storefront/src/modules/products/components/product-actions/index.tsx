@@ -26,6 +26,17 @@ type ProductActionsProps = {
   product: HttpTypes.StoreProduct
   region: HttpTypes.StoreRegion
   disabled?: boolean
+  /**
+   * True when this is one of several products on a page rather than the
+   * product the page is about.
+   *
+   * Two things here assume they are the only copy on screen: the selected
+   * variant is mirrored into a `v_id` query parameter, and a sticky bar
+   * appears once the buy button scrolls away. Both are right for a product
+   * page and wrong anywhere else. Two copies sharing one URL overwrite each
+   * other's `v_id` forever, and two sticky bars stack over the page.
+   */
+  embedded?: boolean
 }
 
 const optionsAsKeymap = (
@@ -43,6 +54,7 @@ const optionsAsKeymap = (
 export default function ProductActions({
   product,
   disabled,
+  embedded = false,
 }: ProductActionsProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -118,6 +130,12 @@ export default function ProductActions({
   }, [product.variants, options])
 
   useEffect(() => {
+    // One URL cannot describe two products. On a page showing several, each
+    // copy would claim `v_id`, see a stranger's value, and claim it back —
+    // a router.replace loop that never settles, which reads as the size
+    // resetting itself and a page that will not scroll.
+    if (embedded) return
+
     const params = new URLSearchParams(searchParams.toString())
     const value = isValidVariant ? selectedVariant?.id : null
 
@@ -132,7 +150,7 @@ export default function ProductActions({
     }
 
     router.replace(pathname + "?" + params.toString())
-  }, [selectedVariant, isValidVariant])
+  }, [selectedVariant, isValidVariant, embedded])
 
   // ===== Product Action State Machine =====
   const needsSelection = !selectedVariant || !isValidVariant
@@ -306,7 +324,7 @@ export default function ProductActions({
           <div>isPreorder: {String(isPreorder)}</div>
         </div>
         */}
-        {!isDownloadOnly && (
+        {!isDownloadOnly && !embedded && (
           <MobileActions
             product={product}
             variant={selectedVariant}

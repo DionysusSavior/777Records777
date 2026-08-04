@@ -70,7 +70,9 @@ export default async function UniformShelf({
               {product.subtitle && <p className="mt-1 text-sm text-white/50">{product.subtitle}</p>}
 
               <div className="mt-4">
-                <ProductActions product={product} region={region} />
+                {/* embedded: this page shows several products, so this copy
+                    must not claim the URL's v_id or raise a sticky bar. */}
+                <ProductActions product={product} region={region} embedded />
               </div>
 
               <div className="mt-6">
