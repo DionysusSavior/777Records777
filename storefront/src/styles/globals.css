@@ -126,52 +126,6 @@
     box-shadow: 0 0 0 rgba(120, 240, 255, 0);
   }
 
-  .footer-social-link {
-    display: block;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 0.85rem;
-    padding: 0.8rem 0.95rem;
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
-      radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 60%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 1px 3px rgba(0, 0, 0, 0.4);
-    transition:
-      transform 220ms ease,
-      border-color 220ms ease,
-      box-shadow 220ms ease,
-      background 220ms ease;
-  }
-
-  .footer-social-link:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 4px 16px rgba(0, 0, 0, 0.6);
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.06)),
-      radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 64%);
-  }
-
-  .footer-social-label {
-    display: block;
-    font-size: 0.92rem;
-    font-weight: 500;
-    letter-spacing: 0.015em;
-    color: #f5f5f4;
-    line-height: 1.2;
-  }
-
-  .footer-social-handle {
-    display: block;
-    margin-top: 0.38rem;
-    color: rgba(245, 245, 244, 0.55);
-    font-size: 0.72rem;
-    letter-spacing: 0.025em;
-  }
-
   .content-container {
     @apply max-w-[1440px] w-full mx-auto px-6;
   }

@@ -4,24 +4,6 @@ import { Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
-const SOCIAL_LINKS = [
-  {
-    label: "777Records777 Instagram",
-    handle: "@777records777",
-    href: "https://www.instagram.com/777records777/",
-  },
-  {
-    label: "777Records777 Youtube",
-    handle: "@Thehighroseempire",
-    href: "https://www.youtube.com/@Thehighroseempire",
-  },
-  {
-    label: "OM7.foundation Instagram",
-    handle: "@om7.foundation",
-    href: "https://www.instagram.com/om7.foundation",
-  },
-]
-
 export default async function Footer() {
   const { collections } = await listCollections({
     fields: "*products",
@@ -117,23 +99,6 @@ export default async function Footer() {
                 </ul>
               </div>
             )}
-            <div className="flex flex-col gap-y-3">
-              <ul className="grid grid-cols-1 gap-3">
-                {SOCIAL_LINKS.map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="footer-social-link"
-                    >
-                      <span className="footer-social-label holo-text">{link.label}</span>
-                      <span className="footer-social-handle holo-text">{link.handle}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </div>
         <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
