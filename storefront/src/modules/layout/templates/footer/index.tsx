@@ -9,11 +9,18 @@ export default async function Footer() {
     fields: "*products",
   })
   const productCategories = await listCategories()
+  const hasCategories = Boolean(productCategories?.length)
+  const hasCollections = Boolean(collections?.length)
 
   return (
-    <footer className="border-t border-ui-border-base w-full">
+    <footer className="mt-auto w-full border-t border-ui-border-base">
       <div className="content-container flex flex-col w-full">
-        <div className="py-32">
+        {/* Only takes up room when there is something to put in it. This block
+            held 256px of padding around a grid that is empty whenever the store
+            has no categories or collections, which was most of the dead space
+            under every page. */}
+        {(hasCategories || hasCollections) && (
+        <div className="py-16">
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
               <div className="flex flex-col gap-y-2">
@@ -101,7 +108,8 @@ export default async function Footer() {
             )}
           </div>
         </div>
-        <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
+        )}
+        <div className="flex w-full justify-between py-8 text-ui-fg-muted">
           <Text className="txt-compact-small">
             © {new Date().getFullYear()} 777Records777 Studio. All rights reserved.
           </Text>

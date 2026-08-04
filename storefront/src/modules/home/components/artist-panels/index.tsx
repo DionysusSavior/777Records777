@@ -151,7 +151,7 @@ export default function ArtistPanels({ artists }: { artists: Artist[] }) {
      * is what makes it look raised, and a panel clipped at the window edge
      * cannot look like it is above anything.
      */
-    <section className="mx-auto flex max-w-[1600px] snap-x snap-mandatory gap-6 overflow-x-auto px-6 py-14 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden small:grid small:grid-cols-2 small:gap-12 small:overflow-visible small:px-12 small:py-20">
+    <section className="mx-auto flex w-full max-w-[1600px] flex-1 items-center snap-x snap-mandatory gap-6 overflow-x-auto px-6 py-14 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden small:grid small:grid-cols-2 small:gap-12 small:overflow-visible small:px-12 small:py-20">
       {artists.map((artist, i) => (
         <Panel key={artist.handle} artist={artist} index={i} />
       ))}

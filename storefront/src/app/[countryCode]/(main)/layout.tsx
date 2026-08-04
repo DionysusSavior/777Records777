@@ -25,7 +25,9 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
   }
 
   return (
-    <>
+    /* A column at least as tall as the window: whatever the page is, the
+       footer ends up at the bottom of it rather than partway down. */
+    <div className="flex min-h-[100dvh] flex-col">
       <Nav />
       {customer && cart && (
         <CartMismatchBanner customer={customer} cart={cart} />
@@ -40,6 +42,6 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
       )}
       {props.children}
       <Footer />
-    </>
+    </div>
   )
 }
