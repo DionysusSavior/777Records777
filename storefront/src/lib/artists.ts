@@ -61,22 +61,6 @@ const LABEL_SOUNDS = [
 
 export const ARTISTS: Artist[] = [
   {
-    handle: "dionysus-savior",
-    name: "Dionysus Savior",
-    tagline: "Sounds, uniforms, amulets",
-    photo: "/artists/dionysus-savior.webp",
-    focus: "50% 50%",
-    glow: "rgba(214, 34, 46, 0.42)",
-    bookingEmail: "dionysussavior@outlook.com",
-    // Credits taken from the product titles in Medusa, not guessed.
-    soundIds: [
-      "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
-      ...LABEL_SOUNDS,
-    ],
-    uniformIds: LABEL_UNIFORMS,
-    amuletIds: [],
-  },
-  {
     handle: "viz",
     name: "Viz",
     tagline: "Sounds, uniforms, amulets",
@@ -88,6 +72,22 @@ export const ARTISTS: Artist[] = [
     bookingEmail: "vizisreal@gmail.com",
     soundIds: [
       "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
+      ...LABEL_SOUNDS,
+    ],
+    uniformIds: LABEL_UNIFORMS,
+    amuletIds: [],
+  },
+  {
+    handle: "dionysus-savior",
+    name: "Dionysus Savior",
+    tagline: "Sounds, uniforms, amulets",
+    photo: "/artists/dionysus-savior.webp",
+    focus: "50% 50%",
+    glow: "rgba(214, 34, 46, 0.42)",
+    bookingEmail: "dionysussavior@outlook.com",
+    // Credits taken from the product titles in Medusa, not guessed.
+    soundIds: [
+      "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
       ...LABEL_SOUNDS,
     ],
     uniformIds: LABEL_UNIFORMS,

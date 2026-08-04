@@ -8,12 +8,16 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import type { Artist } from "@lib/artists"
 
 /**
- * The home page: the roster, side by side, floating over the page.
+ * The home page: the roster, floating over the page.
  *
- * Two panels next to each other rather than stacked, so the roster is one
- * decision taken in a single glance instead of a scroll. They only sit side by
- * side once there is width for it; on a phone they stack, because two panels
- * across 375px are thumbnails and nobody is choosing between thumbnails.
+ * Side by side where there is width for it, and a rolodex you push sideways
+ * with a thumb where there is not. Either way it is one decision rather than
+ * something you scroll past, which is what a two-name roster should be. Two
+ * panels across 375px would be thumbnails, and nobody chooses between
+ * thumbnails, so the phone gets one at a time with the next one peeking in.
+ *
+ * They are not numbered. A list of two does not need counting, and 01 and 02
+ * imply a ranking nobody asked for.
  *
  * The floating is three effects that only work together. A drop shadow does
  * nothing on a near-black page, so height is suggested by the light each panel
@@ -46,7 +50,9 @@ function Panel({ artist, index }: { artist: Artist; index: number }) {
   return (
     <motion.div
       ref={ref}
-      className="relative"
+      // Nearly the full window on a phone so one panel reads as one card, and
+      // the next one peeks in to say the rail keeps going.
+      className="relative w-[84vw] shrink-0 snap-center small:w-auto small:shrink"
       initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 56 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
@@ -105,10 +111,7 @@ function Panel({ artist, index }: { artist: Artist; index: number }) {
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.05)_42%,rgba(0,0,0,0.6)_100%)]" />
 
             <header className="absolute inset-x-0 top-0 p-5 small:p-8">
-              <span className="block text-[10px] uppercase tracking-[0.42em] text-white/45">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h2 className="mt-2 text-[11vw] font-black uppercase leading-[0.85] tracking-[-0.035em] text-white xsmall:text-[8vw] small:text-[3.4vw]">
+              <h2 className="text-[11vw] font-black uppercase leading-[0.85] tracking-[-0.035em] text-white xsmall:text-[8vw] small:text-[3.4vw]">
                 {artist.name}
               </h2>
               <p className="mt-2 text-[10px] uppercase tracking-[0.26em] text-white/55 small:text-xs">
@@ -136,9 +139,19 @@ function Panel({ artist, index }: { artist: Artist; index: number }) {
 
 export default function ArtistPanels({ artists }: { artists: Artist[] }) {
   return (
-    // Generous padding rather than full bleed: a panel pressed against the
-    // window edge cannot look like it is above the page.
-    <section className="mx-auto grid max-w-[1600px] grid-cols-1 gap-14 px-6 py-14 small:grid-cols-2 small:gap-12 small:px-12 small:py-20">
+    /**
+     * A rail on a phone, a pair on a desktop.
+     *
+     * Stacked, the roster was something you scrolled past on the way to the
+     * footer, and the second artist only existed if you kept going. Side by
+     * side it is a choice, which is what a two-name roster should be — so on a
+     * phone it becomes a rolodex you push through with a thumb instead.
+     *
+     * The vertical padding stays generous in both: the glow under each panel
+     * is what makes it look raised, and a panel clipped at the window edge
+     * cannot look like it is above anything.
+     */
+    <section className="mx-auto flex max-w-[1600px] snap-x snap-mandatory gap-6 overflow-x-auto px-6 py-14 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden small:grid small:grid-cols-2 small:gap-12 small:overflow-visible small:px-12 small:py-20">
       {artists.map((artist, i) => (
         <Panel key={artist.handle} artist={artist} index={i} />
       ))}
