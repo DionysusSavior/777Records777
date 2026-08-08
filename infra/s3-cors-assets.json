@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://om7.foundation", "https://777records777.studio"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["Range", "Content-Type"],
+    "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "Content-Type"],
+    "MaxAgeSeconds": 86400
+  }
+]
