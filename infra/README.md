@@ -21,6 +21,9 @@ seek instead of buffering from zero.
 
 ## Applying it
 
+The configuration must be wrapped in a `CORSRules` object. A bare array is
+what the S3 console shows and what the CLI rejects.
+
 ```
 aws s3api put-bucket-cors \
   --bucket 777records777productpageassets \
@@ -36,12 +39,22 @@ curl -sI -H "Origin: https://om7.foundation" \
   | grep -i access-control
 ```
 
+## The bucket already had CORS
+
+It was not missing, it was incomplete — two origins were allowed, the Render
+deployment and 777records777.studio, and om7.foundation was not one of them.
+That is why the fetch failed from the card, and it is a different problem from
+the one the absence of headers suggested. `put-bucket-cors` REPLACES the whole
+configuration rather than adding to it, so the file here carries all three
+origins; writing only the new one would have taken the storefront's own access
+away.
+
 ## Named origins rather than `*`
 
 `*` would work and is what OM7 tells other artists to use, because most of
 them are on a host where a wildcard is the only setting available and a
 listable bucket of public audio is not worth a lecture. This bucket is ours,
-the two sites that read it are known, and there is no reason to let every
+the three sites that read it are known, and there is no reason to let every
 other page on the internet pull these files through script.
 
 ## The other half: the file is a 44 MB wav

@@ -1,9 +1,15 @@
-[
-  {
-    "AllowedOrigins": ["https://om7.foundation", "https://777records777.studio"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": ["Range", "Content-Type"],
-    "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "Content-Type"],
-    "MaxAgeSeconds": 86400
-  }
-]
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "https://seven77records777.onrender.com",
+        "https://777records777.studio",
+        "https://om7.foundation"
+      ],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag", "Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}
