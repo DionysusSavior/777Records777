@@ -83,7 +83,10 @@ export const ARTISTS: Artist[] = [
     tagline: "Sounds, uniforms, amulets",
     photo: "/artists/dionysus-savior.webp",
     focus: "50% 50%",
-    glow: "rgba(214, 34, 46, 0.42)",
+    // Cool, to match the studio blue of the seated portrait. The red here was
+    // taken from the photograph this replaced; left on the new one it read as
+    // a colour laid over the panel rather than light spilling out of it.
+    glow: "rgba(138, 170, 208, 0.34)",
     bookingEmail: "dionysussavior@outlook.com",
     // Credits taken from the product titles in Medusa, not guessed.
     soundIds: [
