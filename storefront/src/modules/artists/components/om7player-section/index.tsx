@@ -2,13 +2,21 @@ import Image from "next/image"
 
 import { OM7_PLAYER_URL } from "@lib/sounds"
 
-/** The App Store set, same five and same order as the listing. */
+/**
+ * The App Store set, same six and same order as the listing.
+ *
+ * The alt text is the caption printed on each shot rather than a separate
+ * description of it. Somebody using a screen reader should get what somebody
+ * looking at it gets, and what they get is the caption - inventing different
+ * words here would give the two audiences two different pitches.
+ */
 const SHOTS = [
-  { src: "/om7player/01-appstore-6.9.png", alt: "Own your music library" },
-  { src: "/om7player/02-appstore-6.9.png", alt: "Point it at a folder" },
-  { src: "/om7player/03-appstore-6.9.png", alt: "Make the cover yours" },
-  { src: "/om7player/04-appstore-6.9.png", alt: "Take notes on the take" },
-  { src: "/om7player/05-appstore-6.9.png", alt: "Become the ultimate artist" },
+  { src: "/om7player/01-appstore-6.9.png", alt: "The files are already yours" },
+  { src: "/om7player/02-appstore-6.9.png", alt: "Your tools, and other artists" },
+  { src: "/om7player/03-appstore-6.9.png", alt: "Your pace, your dates" },
+  { src: "/om7player/04-appstore-6.9.png", alt: "Loop the part that bothers you" },
+  { src: "/om7player/05-appstore-6.9.png", alt: "Make your own card" },
+  { src: "/om7player/06-appstore-6.9.png", alt: "Find artists, not algorithms" },
 ]
 
 /**
@@ -19,7 +27,7 @@ const SHOTS = [
  * this page, and putting a link off-site above them would spend attention that
  * had somewhere better to go.
  *
- * The screenshots scroll rather than wrap into a grid. Five phone screens laid
+ * The screenshots scroll rather than wrap into a grid. Six phone screens laid
  * flat is a wall; a rail reads as a set you flick through, which is how the
  * App Store shows them and therefore how they were composed.
  */

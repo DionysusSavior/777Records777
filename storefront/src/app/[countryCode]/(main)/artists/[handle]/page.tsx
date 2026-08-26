@@ -79,7 +79,7 @@ export default async function ArtistPage(props: Props) {
         <FeatureRequest artistHandle={artist.handle} artistName={artist.name} />
       </Section>
 
-      <Section title="OM7Player" note="Your library, on your phone. No account, no upload, no stream.">
+      <Section title="OM7Player" note="Your library on your phone, plus notes, projects and budgets — and a directory of independent artists who own their own sites. No account to play, no ads, no subscriptions.">
         <Om7PlayerSection />
       </Section>
     </>
