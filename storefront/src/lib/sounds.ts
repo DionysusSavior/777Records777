@@ -1,6 +1,21 @@
 type SoundDownload = {
   url: string
   label: string
+  /**
+   * A `.om7` release bundle: the song, the vertical reel that plays behind it
+   * in OM7Player, artwork, and the way back here.
+   *
+   * When this is empty the OM7Player button falls through to the App Store,
+   * which is the right answer for a song that has no bundle yet - sending
+   * somebody to a download that does not exist would be worse than sending
+   * them to the app.
+   *
+   * The URL must keep its `.om7` extension. OM7Player claims the type by
+   * FILENAME EXTENSION and deliberately declares no MIME tag, so the extension
+   * is the only thing Safari and Mail match on when deciding to offer the app.
+   * S3 serves these as application/octet-stream so they download rather than
+   * render.
+   */
   om7PlayerUrl?: string
 }
 
@@ -13,12 +28,14 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
   prod_01KJAM74E83E3PEHKTZNSDEGRV: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.wav",
     label: "Download Gone Crazy",
-    om7PlayerUrl: "",
+    om7PlayerUrl:
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.om7",
   },
   prod_01KQAK7DCK4SFVFGHXSYPHXBB1: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New+Deal-+master.wav",
     label: "Download New Deal",
-    om7PlayerUrl: "",
+    om7PlayerUrl:
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New%20Deal.om7",
   },
 }
 
