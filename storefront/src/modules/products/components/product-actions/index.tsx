@@ -164,9 +164,20 @@ export default function ProductActions({
 
   const soundDownload = getSoundDownload(product)
   const isDownloadOnly = Boolean(soundDownload)
+  /*
+   The second button on a sound page points at one of two different things,
+   so it has to say two different things.
+
+   With a bundle it hands over a .om7 - the song, the reel and the way back
+   here - which opens in OM7Player. Without one it sends you to the App Store
+   to get the app first. Labelling both "Download OM7Player" would promise the
+   app and deliver a song, which is the kind of small lie that makes people
+   stop trusting a download button.
+  */
+  const om7Bundle = soundDownload?.om7PlayerUrl
   const om7PlayerHref =
-    soundDownload?.om7PlayerUrl ||
-    "https://apps.apple.com/us/app/om7player/id6755060481"
+    om7Bundle || "https://apps.apple.com/us/app/om7player/id6755060481"
+  const om7PlayerLabel = om7Bundle ? "Open in OM7Player" : "Download OM7Player"
 
   const shouldPulsePreorder = isPreorder && canBuy && !isAdding
 
@@ -298,7 +309,7 @@ export default function ProductActions({
               className="w-full h-14 px-8 sound-download-btn heartbeat-glow"
             >
               <a href={om7PlayerHref} target="_blank" rel="noreferrer noopener">
-                Download OM7Player
+                {om7PlayerLabel}
               </a>
             </Button>
           </div>
