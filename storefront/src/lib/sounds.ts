@@ -29,7 +29,7 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.wav",
     label: "Download Gone Crazy",
     om7PlayerUrl:
-      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.om7",
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Gone%20Crazy.om7",
   },
   prod_01KQAK7DCK4SFVFGHXSYPHXBB1: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New+Deal-+master.wav",
