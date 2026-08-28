@@ -10,3 +10,6 @@ coverage/
 .medusa/
 storefront/public/admin/
 storefront/PRODUCT_UPDATE_REFERENCE.md
+
+# Release bundles are built from the masters, which live in S3, not here.
+*.om7
