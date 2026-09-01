@@ -32,3 +32,25 @@ services:
         sync: false
       - key: PREORDER_REPLY_TO
         sync: false
+      - key: OM7_SITE_MANAGER_TOKEN_SHA256
+        sync: false
+      - key: OM7_SITE_MANAGER_RECEIPT_SECRET
+        sync: false
+      - key: OM7_SITE_MANAGER_S3_BUCKET
+        value: 777records777productpageassets
+      - key: OM7_SITE_MANAGER_S3_REGION
+        value: us-east-2
+      - key: OM7_SITE_MANAGER_PUBLIC_BASE_URL
+        sync: false
+      - key: OM7_SITE_MANAGER_KEY_PREFIX
+        value: site-manager
+      - key: OM7_SITE_MANAGER_MAX_BYTES
+        value: "5368709120"
+      - key: OM7_SITE_MANAGER_UPLOAD_TTL_SECONDS
+        value: "900"
+      - key: OM7_SITE_MANAGER_RECEIPT_TTL_SECONDS
+        value: "86400"
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
