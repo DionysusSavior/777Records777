@@ -8,12 +8,43 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import CartButton from "@modules/layout/components/cart-button"
 import SideMenu from "@modules/layout/components/side-menu"
 
+/**
+ * THE NAV IS IN THE ROOT LAYOUT, SO ITS FAILURES ARE THE WHOLE SITE'S.
+ *
+ * These three calls reach the commerce backend for a region list, a locale
+ * list and the current locale - all of which decorate a menu. `medusaError`
+ * rethrows on any transport failure, and because this component renders on
+ * every route, an unreachable backend used to turn every page into a 500,
+ * including artist pages and free downloads that sell nothing.
+ *
+ * The menu degrades instead. Empty lists give a region and language switcher
+ * with nothing to switch to, which is a correct description of the situation
+ * during an outage, and every other part of the site keeps working.
+ *
+ * Settled individually rather than with one Promise.all: that helper rejects
+ * as a whole, so a locale lookup failing would have discarded a perfectly good
+ * region list alongside it.
+ */
 export default async function Nav() {
-  const [regions, locales, currentLocale] = await Promise.all([
+  const [regionsResult, localesResult, localeResult] = await Promise.allSettled([
     listRegions().then((regions: StoreRegion[]) => regions),
     listLocales(),
     getLocale(),
   ])
+
+  if (regionsResult.status === "rejected") {
+    console.error(
+      "nav: region list unavailable, rendering without it.",
+      regionsResult.reason instanceof Error
+        ? regionsResult.reason.message
+        : regionsResult.reason
+    )
+  }
+
+  const regions = regionsResult.status === "fulfilled" ? regionsResult.value : []
+  const locales = localesResult.status === "fulfilled" ? localesResult.value : []
+  const currentLocale =
+    localeResult.status === "fulfilled" ? localeResult.value : null
 
   return (
     <div className="sticky top-0 inset-x-0 z-50 group">

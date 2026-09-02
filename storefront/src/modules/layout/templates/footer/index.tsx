@@ -4,11 +4,36 @@ import { Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
+/**
+ * The footer is in the layout, so it renders on every page - and both of these
+ * calls reach the commerce backend for links.
+ *
+ * Unguarded, an unreachable backend threw here and 500'd the whole site,
+ * including pages that sell nothing. The block below already collapses to
+ * nothing when there are no categories or collections, so an outage lands in
+ * that same empty state instead of taking the page with it.
+ */
 export default async function Footer() {
-  const { collections } = await listCollections({
-    fields: "*products",
-  })
-  const productCategories = await listCategories()
+  const [collectionsResult, categoriesResult] = await Promise.allSettled([
+    listCollections({ fields: "*products" }),
+    listCategories(),
+  ])
+
+  if (collectionsResult.status === "rejected") {
+    console.error(
+      "footer: store links unavailable, rendering without them.",
+      collectionsResult.reason instanceof Error
+        ? collectionsResult.reason.message
+        : collectionsResult.reason
+    )
+  }
+
+  const collections =
+    collectionsResult.status === "fulfilled"
+      ? collectionsResult.value.collections
+      : []
+  const productCategories =
+    categoriesResult.status === "fulfilled" ? categoriesResult.value : []
   const hasCategories = Boolean(productCategories?.length)
   const hasCollections = Boolean(collections?.length)
 

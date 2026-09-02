@@ -27,19 +27,38 @@ export default async function SoundShelf({
   countryCode: string
   productIds: string[]
 }) {
-  const region = await getRegion(countryCode)
-  if (!region || productIds.length === 0) {
+  /**
+   * A shelf that cannot reach the backend says "Coming soon", it does not
+   * take the page down with it.
+   *
+   * Both calls below throw when the commerce backend is unreachable, and this
+   * component renders inside the artist page - so an outage used to 500 a page
+   * whose reason for existing is a free download that needs no backend at all.
+   * The empty state already existed for the case where an artist has no
+   * products; an unreachable backend is the same thing from a visitor's point
+   * of view, so it lands in the same place rather than in a new one.
+   */
+  let products: Awaited<ReturnType<typeof listProductsWithSort>>["response"]["products"] = []
+  try {
+    const region = await getRegion(countryCode)
+    if (!region || productIds.length === 0) {
+      return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
+    }
+
+    const result = await listProductsWithSort({
+      page: 1,
+      queryParams: { limit: 12, id: productIds },
+      sortBy: "created_at",
+      countryCode,
+    })
+    products = result.response.products
+  } catch (error) {
+    console.error(
+      "shelf: products unavailable, rendering the empty state.",
+      error instanceof Error ? error.message : error
+    )
     return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
   }
-
-  const {
-    response: { products },
-  } = await listProductsWithSort({
-    page: 1,
-    queryParams: { limit: 12, id: productIds },
-    sortBy: "created_at",
-    countryCode,
-  })
 
   if (products.length === 0) {
     return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>

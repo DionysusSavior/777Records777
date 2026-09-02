@@ -49,18 +49,8 @@ async function getRegionMap(cacheId: string) {
       cache: "force-cache",
     })
 
-    console.log("MEDUSA", backendUrl)
-    console.log(
-      "HAS_PUBLISHABLE_KEY",
-      !!publishableKey,
-      "LEN",
-      publishableKey?.length
-    )
-
-    console.log("REGIONS_STATUS", res.status)
     if (!res.ok) {
-      console.log("REGIONS_BODY", await res.text())
-      throw new Error("Error fetching regions")
+      throw new Error(`Error fetching regions: ${res.status}`)
     }
 
     const { regions } = await res.json()
@@ -134,7 +124,34 @@ export async function middleware(request: NextRequest) {
   const cacheIdCookie = request.cookies.get("_medusa_cache_id")
   const cacheId = cacheIdCookie?.value || crypto.randomUUID()
 
-  const regionMap = await getRegionMap(cacheId)
+  /**
+   * A COMMERCE OUTAGE MUST NOT TAKE DOWN PAGES THAT SELL NOTHING.
+   *
+   * getRegionMap throws when the Medusa backend answers non-ok, and this
+   * matcher covers `/`, every artist page and every free download - so an
+   * unreachable commerce service used to return 500 for the whole site,
+   * including pages that never touch it. A one-hour force-cache window hid it
+   * until an edge went cold, which is the worst version: rare, and total.
+   *
+   * Falling back to DEFAULT_REGION keeps every page serving. What degrades is
+   * only region selection, which is what the backend was being asked about -
+   * a visitor gets the default region instead of their own, and the store
+   * still works. That is the right trade against the site being down.
+   */
+  let regionMap: Awaited<ReturnType<typeof getRegionMap>> | null = null
+  try {
+    regionMap = await getRegionMap(cacheId)
+  } catch (error) {
+    console.error(
+      "middleware: region lookup failed, serving with the default region.",
+      error instanceof Error ? error.message : error
+    )
+  }
+
+  if (!regionMap || !regionMap.keys().next().value) {
+    return regionFallback(request, cacheId, cacheIdCookie !== undefined)
+  }
+
   const countryCode = regionMap && (await getCountryCode(request, regionMap))
   const urlHasCountryCode =
     countryCode && request.nextUrl.pathname.split("/")[1].includes(countryCode)
@@ -162,10 +179,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 307)
   }
 
-  return new NextResponse(
-    "No valid regions configured. Please set up regions with countries in your Medusa Admin.",
-    { status: 500 }
+  return regionFallback(request, cacheId, cacheIdCookie !== undefined)
+}
+
+/**
+ * Route on DEFAULT_REGION alone, with no backend involved.
+ *
+ * Reached when the region lookup failed or returned nothing. It performs the
+ * same country-code prefixing the healthy path does, so URLs stay identical
+ * and a later request that DOES reach the backend is not a different site.
+ */
+function regionFallback(
+  request: NextRequest,
+  cacheId: string,
+  hasCookie: boolean
+) {
+  const urlHasCountryCode = request.nextUrl.pathname
+    .split("/")[1]
+    ?.toLowerCase() === DEFAULT_REGION.toLowerCase()
+
+  if (urlHasCountryCode) {
+    return NextResponse.next()
+  }
+
+  const path = request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+  const query = request.nextUrl.search ?? ""
+  const res = NextResponse.redirect(
+    `${request.nextUrl.origin}/${DEFAULT_REGION}${path}${query}`,
+    307
   )
+  // Set the cache id here too, so a visitor arriving during an outage does not
+  // bounce through this redirect on every single request afterwards.
+  if (!hasCookie) {
+    res.cookies.set("_medusa_cache_id", cacheId, { maxAge: 60 * 60 * 24 })
+  }
+  return res
 }
 
 export const config = {

@@ -13,15 +13,38 @@ export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
 }
 
+/**
+ * THIS LAYOUT WRAPS EVERY PAGE, SO ITS FAILURES ARE EVERY PAGE'S.
+ *
+ * All three calls below reach the commerce backend, and all three feed
+ * decoration: a cart-mismatch banner, a free-shipping nudge, and the cart
+ * count in the nav. None of them is why a visitor came. Yet an unreachable
+ * backend threw here and returned 500 for the entire site - artist pages and
+ * free downloads included, which need no backend at all.
+ *
+ * Every one degrades to nothing. A signed-out-looking nav and no banners is a
+ * fair description of an outage; a 500 on a page that sells nothing is not.
+ */
+async function orNull<T>(work: Promise<T>, what: string): Promise<T | null> {
+  try {
+    return await work
+  } catch (error) {
+    console.error(
+      `layout: ${what} unavailable, rendering without it.`,
+      error instanceof Error ? error.message : error
+    )
+    return null
+  }
+}
+
 export default async function PageLayout(props: { children: React.ReactNode }) {
-  const customer = await retrieveCustomer()
-  const cart = await retrieveCart()
+  const customer = await orNull(retrieveCustomer(), "customer")
+  const cart = await orNull(retrieveCart(), "cart")
   let shippingOptions: StoreCartShippingOption[] = []
 
   if (cart) {
-    const { shipping_options } = await listCartOptions()
-
-    shippingOptions = shipping_options
+    const options = await orNull(listCartOptions(), "shipping options")
+    shippingOptions = options?.shipping_options ?? []
   }
 
   return (
