@@ -2,13 +2,13 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "SiteManagerWriteAndInspectOnePrefixOnly",
+      "Sid": "OneArtistOnePrefixOnly",
       "Effect": "Allow",
       "Action": [
         "s3:PutObject",
         "s3:GetObject"
       ],
-      "Resource": "arn:aws:s3:::777records777productpageassets/site-manager/*"
+      "Resource": "arn:aws:s3:::777records777productpageassets/site-manager/ARTIST/*"
     }
   ]
 }

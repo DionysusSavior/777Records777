@@ -28,16 +28,31 @@ sign a one-object PUT, and read that object's headers back. Nothing else.
 already knows. That is bounded by the keys being random UUIDs, which is the
 same reason the protocol refuses to use the phone's filename.
 
+## ARTIST is a placeholder, and substituting it is the whole point
+
+The resource ends `/site-manager/ARTIST/*`. Replace `ARTIST` with that one
+person's handle - `dion`, `viz` - and mint a separate user for each.
+
+**A shared `site-manager/*` is a bug, not a shortcut.** The first version of
+this file granted exactly that, which would have let any artist holding a key
+overwrite any other artist's manifest and media. One prefix per person is what
+buys the three properties the design claims: nobody can overwrite anybody, one
+person can be revoked without rotating everyone, and two phones can never race
+on one manifest because no two phones write the same one.
+
 ## Creating it
 
 These steps mint a credential, so they are Dion's to run, not an agent's.
 
-    aws iam create-user --user-name om7-site-manager-777
+    ARTIST=dion   # one per person, never shared
+    sed "s/ARTIST/$ARTIST/" infra/site-manager-s3-policy.json > /tmp/$ARTIST-policy.json
+
+    aws iam create-user --user-name om7-site-manager-$ARTIST
     aws iam put-user-policy \
-      --user-name om7-site-manager-777 \
+      --user-name om7-site-manager-$ARTIST \
       --policy-name site-manager-s3 \
-      --policy-document file://infra/site-manager-s3-policy.json
-    aws iam create-access-key --user-name om7-site-manager-777
+      --policy-document file:///tmp/$ARTIST-policy.json
+    aws iam create-access-key --user-name om7-site-manager-$ARTIST
 
 The last command prints the only copy of the secret. Put the two values
 straight into Render as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and do
