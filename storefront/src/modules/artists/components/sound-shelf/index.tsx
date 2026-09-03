@@ -141,6 +141,7 @@ function ManifestSound({ item }: { item: SiteManagerManifestItem }) {
         images={item.kind === "video" ? [{ url: item.url }] : []}
         size="square"
         isFeatured
+        placeholder={item.kind === "audio" ? "audio" : "image"}
       />
 
       <div className="mt-4 flex items-center justify-between gap-3">

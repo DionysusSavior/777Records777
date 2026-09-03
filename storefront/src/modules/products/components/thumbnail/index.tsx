@@ -12,6 +12,7 @@ type ThumbnailProps = {
   isFeatured?: boolean
   className?: string
   mediaClassName?: string
+  placeholder?: "image" | "audio"
   "data-testid"?: string
 }
 
@@ -22,6 +23,7 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
   isFeatured,
   className,
   mediaClassName,
+  placeholder = "image",
   "data-testid": dataTestid,
 }) => {
   const mediaCandidates = [
@@ -51,6 +53,7 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
         mediaUrl={mediaUrl}
         size={size}
         mediaClassName={mediaClassName}
+        placeholder={placeholder}
       />
     </Container>
   )
@@ -79,7 +82,10 @@ const MediaOrPlaceholder = ({
   mediaUrl,
   size,
   mediaClassName,
-}: Pick<ThumbnailProps, "size" | "mediaClassName"> & { mediaUrl?: string }) => {
+  placeholder,
+}: Pick<ThumbnailProps, "size" | "mediaClassName" | "placeholder"> & {
+  mediaUrl?: string
+}) => {
   if (mediaUrl && isVideoUrl(mediaUrl)) {
     return (
       <video
@@ -111,6 +117,31 @@ const MediaOrPlaceholder = ({
         fill
         unoptimized={shouldBypassOptimization(mediaUrl)}
       />
+    )
+  }
+
+  if (placeholder === "audio") {
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/[0.08] via-transparent to-white/[0.03] text-white/70"
+        aria-label="Audio artwork placeholder"
+      >
+        <svg
+          width="42"
+          height="42"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M9 18V5l10-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="16" cy="16" r="3" />
+        </svg>
+      </div>
     )
   }
 
