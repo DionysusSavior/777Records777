@@ -13,6 +13,7 @@
     "build:backend": "npm --workspace backend run build",
     "build:storefront": "npm --workspace storefront run build",
     "build:admin": "npm --workspace admin run build",
+    "test:site-manager-manifest": "ts-node --project storefront/tsconfig.json --compiler-options '{\"module\":\"CommonJS\"}' storefront/scripts/test-site-manager-manifest.ts",
     "preview:admin": "npm --workspace admin run preview",
     "lint:storefront": "npm --workspace storefront run lint"
   }
