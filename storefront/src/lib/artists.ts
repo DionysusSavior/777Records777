@@ -40,6 +40,13 @@ export type Artist = {
    * forwarding mail by hand forever.
    */
   bookingEmail: string
+  /**
+   * The artist-owned list written by Site Manager direct mode.
+   *
+   * This is data, not a derived bucket path: another artist can use a CDN or
+   * another storage provider without teaching the storefront their layout.
+   */
+  manifestUrl?: string
   soundIds: string[]
   uniformIds: string[]
   amuletIds: string[]
@@ -70,6 +77,8 @@ export const ARTISTS: Artist[] = [
     // warm glow here would look pasted on.
     glow: "rgba(148, 163, 184, 0.30)",
     bookingEmail: "vizisreal@gmail.com",
+    manifestUrl:
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json",
     soundIds: [
       "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
       ...LABEL_SOUNDS,
@@ -88,6 +97,8 @@ export const ARTISTS: Artist[] = [
     // a colour laid over the panel rather than light spilling out of it.
     glow: "rgba(138, 170, 208, 0.34)",
     bookingEmail: "dionysussavior@outlook.com",
+    manifestUrl:
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/index.json",
     // Credits taken from the product titles in Medusa, not guessed.
     soundIds: [
       "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY

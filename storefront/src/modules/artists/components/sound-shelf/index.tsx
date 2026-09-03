@@ -1,6 +1,10 @@
 import { listProductsWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getSoundDownload, getArtworkRotationClassName } from "@lib/sounds"
+import {
+  getSiteManagerItems,
+  type SiteManagerManifestItem,
+} from "@lib/site-manager-manifest"
 import ScrollRail from "@modules/common/components/scroll-rail"
 import Thumbnail from "@modules/products/components/thumbnail"
 
@@ -23,9 +27,11 @@ const isVideo = (url?: string | null) =>
 export default async function SoundShelf({
   countryCode,
   productIds,
+  manifestUrl,
 }: {
   countryCode: string
   productIds: string[]
+  manifestUrl?: string
 }) {
   /**
    * A shelf that cannot reach the backend says "Coming soon", it does not
@@ -38,34 +44,46 @@ export default async function SoundShelf({
    * products; an unreachable backend is the same thing from a visitor's point
    * of view, so it lands in the same place rather than in a new one.
    */
-  let products: Awaited<ReturnType<typeof listProductsWithSort>>["response"]["products"] = []
-  try {
-    const region = await getRegion(countryCode)
-    if (!region || productIds.length === 0) {
-      return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
+  const productsPromise = (async () => {
+    if (productIds.length === 0) return []
+    try {
+      const region = await getRegion(countryCode)
+      if (!region) return []
+
+      const result = await listProductsWithSort({
+        page: 1,
+        queryParams: { limit: 12, id: productIds },
+        sortBy: "created_at",
+        countryCode,
+      })
+      return result.response.products
+    } catch (error) {
+      console.error(
+        "shelf: products unavailable, rendering the artist-owned releases only.",
+        error instanceof Error ? error.message : error
+      )
+      return []
     }
+  })()
 
-    const result = await listProductsWithSort({
-      page: 1,
-      queryParams: { limit: 12, id: productIds },
-      sortBy: "created_at",
-      countryCode,
-    })
-    products = result.response.products
-  } catch (error) {
-    console.error(
-      "shelf: products unavailable, rendering the empty state.",
-      error instanceof Error ? error.message : error
-    )
-    return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
-  }
+  // These fail independently. A commerce outage cannot hide the artist's
+  // direct publishes, and a missing first-publish manifest cannot hide the
+  // existing catalogue.
+  const [manifestItems, products] = await Promise.all([
+    getSiteManagerItems(manifestUrl),
+    productsPromise,
+  ])
 
-  if (products.length === 0) {
+  if (manifestItems.length === 0 && products.length === 0) {
     return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
   }
 
   return (
     <ScrollRail>
+      {manifestItems.map((item) => (
+        <ManifestSound key={`site-manager-${item.id}`} item={item} />
+      ))}
+
       {products.map((product) => {
         const download = getSoundDownload(product)
 
@@ -113,5 +131,37 @@ export default async function SoundShelf({
         )
       })}
     </ScrollRail>
+  )
+}
+
+function ManifestSound({ item }: { item: SiteManagerManifestItem }) {
+  return (
+    <div data-testid="site-manager-sound-wrapper">
+      <Thumbnail
+        images={item.kind === "video" ? [{ url: item.url }] : []}
+        size="square"
+        isFeatured
+      />
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
+          {item.title}
+        </span>
+
+        <a
+          href={item.url}
+          download
+          aria-label={`Download ${item.title}`}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+          Download
+        </a>
+      </div>
+    </div>
   )
 }

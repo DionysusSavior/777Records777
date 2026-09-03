@@ -65,7 +65,11 @@ export default async function ArtistPage(props: Props) {
       <ArtistHero artist={artist} />
 
       <Section title="Sounds" note="Free to download. The files are yours once you have them.">
-        <SoundShelf countryCode={countryCode} productIds={artist.soundIds} />
+        <SoundShelf
+          countryCode={countryCode}
+          productIds={artist.soundIds}
+          manifestUrl={artist.manifestUrl}
+        />
       </Section>
 
       <Section title="Uniforms">
