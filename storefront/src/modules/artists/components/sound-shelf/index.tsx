@@ -161,7 +161,13 @@ function ManifestRelease({
   const reel = itemById(items, release.reel)
   const artwork = itemById(items, release.artwork)
   const bundle = itemById(items, release.bundle)
-  const download = audio ?? bundle
+  // A free download beside a Buy button undercuts the sale it sits next to -
+  // the same file, free, one tap away. Priced releases get Buy only.
+  const download = release.price == null ? audio ?? bundle : null
+  const buyLabel =
+    release.price != null && release.buyUrl
+      ? `Buy — $${(release.price / 100).toFixed(2)}`
+      : null
   const images = artwork
     ? [{ url: artwork.url }]
     : reel
@@ -195,6 +201,24 @@ function ManifestRelease({
               <path d="M5 21h14" />
             </svg>
             Download
+          </a>
+        )}
+
+        {/* External, never `download` - this leaves the site for the
+            artist's own Stripe Payment Link. OM7/777 never sees the money. */}
+        {buyLabel && (
+          <a
+            href={release.buyUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${buyLabel} — ${release.title}`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M20.59 13.41 12 22l-9-9V3h10l9 10a2 2 0 0 1 0 2.83Z" />
+              <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+            {buyLabel}
           </a>
         )}
       </div>

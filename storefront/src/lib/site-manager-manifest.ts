@@ -5,6 +5,7 @@ const MAX_ITEMS = 500
 const MAX_RELEASES = 500
 const MAX_MEDIA_BYTES = 5 * 1024 * 1024 * 1024
 const MAX_PRICE_CENTS = 1_000_000_000
+const MAX_BUY_URL_CHARS = 500
 
 type MediaRule = {
   kind: "audio" | "video" | "image" | "bundle"
@@ -54,6 +55,13 @@ export type SiteManagerManifestRelease = {
   artwork: string | null
   bundle: string | null
   price: number | null
+  /**
+   * The artist's own Stripe Payment Link (or any hosted checkout), in cents
+   * against `price`. Present if and only if `price` is non-null - a priced
+   * release with no way to pay for it, or a link with no stated price, are
+   * both rejected by parseRelease rather than rendered half-formed.
+   */
+  buyUrl: string | null
   visible: boolean
   publishedAt: string
 }
@@ -162,6 +170,34 @@ const parsePrice = (value: unknown): number | null | undefined => {
   return undefined
 }
 
+/**
+ * An external checkout link, https-only with no origin pinning.
+ *
+ * Unlike parseItem's media URLs above, this is deliberately NOT required to
+ * share the manifest's own origin - a Stripe Payment Link lives on
+ * buy.stripe.com or the artist's own checkout domain, never on the bucket
+ * serving the manifest. The precedent is introDownloadUrl in
+ * music-metaverse/infra/lambda/directory/validate.mjs: an artist's own
+ * external link, https-only, no host restriction, because OM7 does not run
+ * or control the destination.
+ */
+const parseBuyUrl = (value: unknown): string | null | undefined => {
+  if (value === null) return null
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_BUY_URL_CHARS) {
+    return undefined
+  }
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return undefined
+  }
+  if (url.protocol !== "https:" || url.username || url.password || !url.host) {
+    return undefined
+  }
+  return value
+}
+
 const parseRelease = (
   value: unknown,
   itemsById: Map<string, SiteManagerManifestItem>
@@ -176,6 +212,15 @@ const parseRelease = (
   if (!("price" in value)) return null
   const price = parsePrice(value.price)
   if (price === undefined) return null
+
+  if (!("buyUrl" in value)) return null
+  const buyUrl = parseBuyUrl(value.buyUrl)
+  if (buyUrl === undefined) return null
+  // Paired, never one without the other - a price with nothing to pay it at,
+  // or a link with no stated price, is a broken catalogue entry, not a
+  // partial one. Rejecting the whole release is this file's convention for
+  // every other malformed field; this is no exception.
+  if ((price === null) !== (buyUrl === null)) return null
 
   const roles: Record<ReleaseRole, string | null> = {
     audio: null,
@@ -209,6 +254,7 @@ const parseRelease = (
     artwork: roles.artwork,
     bundle: roles.bundle,
     price,
+    buyUrl,
     visible: value.visible,
     publishedAt: value.publishedAt,
   }

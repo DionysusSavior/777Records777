@@ -54,9 +54,17 @@ const validRelease = {
   artwork: artItem.id,
   bundle: bundleItem.id,
   price: null,
+  buyUrl: null,
   visible: true,
   publishedAt: "2026-09-03T18:00:00Z",
   ignoredByTheWhitelist: true,
+}
+
+const pricedRelease = {
+  ...validRelease,
+  id: "e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8091",
+  price: 999,
+  buyUrl: "https://buy.stripe.com/test_abc123",
 }
 
 const manifest = (overrides: Record<string, unknown> = {}) => JSON.stringify({
@@ -117,9 +125,10 @@ check("a stated release keeps every role and drops extra fields", () => {
   assert(parsed)
   assert.equal(parsed.releases?.length, 1)
   assert.deepEqual(Object.keys(parsed.releases![0]), [
-    "id", "title", "audio", "reel", "artwork", "bundle", "price", "visible", "publishedAt",
+    "id", "title", "audio", "reel", "artwork", "bundle", "price", "buyUrl", "visible", "publishedAt",
   ])
   assert.equal(parsed.releases![0].price, null)
+  assert.equal(parsed.releases![0].buyUrl, null)
   assert.equal(parsed.releases![0].visible, true)
 })
 
@@ -190,6 +199,42 @@ check("one item on two releases, a release with no files, svg-as-image, html-as-
       ...bundleItem,
       url: "https://artist-bucket.example/site-manager/dion/d5e3f406-7182-4a0c-bcde-f0123456789a.html",
     }],
+  }), manifestUrl), null)
+})
+
+check("a priced release keeps its price and its buy link together", () => {
+  const parsed = parseSiteManagerManifest(manifest({
+    items: [validItem, reelItem, artItem, bundleItem],
+    releases: [pricedRelease],
+  }), manifestUrl)
+  assert(parsed)
+  assert.equal(parsed.releases?.[0].price, 999)
+  assert.equal(parsed.releases?.[0].buyUrl, "https://buy.stripe.com/test_abc123")
+})
+
+check("price without buyUrl, buyUrl without price, http buyUrl, missing buyUrl key all refuse", () => {
+  const base = { items: [validItem, reelItem, artItem, bundleItem] }
+  // A price with nothing to pay it at.
+  assert.equal(parseSiteManagerManifest(manifest({
+    ...base,
+    releases: [{ ...validRelease, price: 999 }],
+  }), manifestUrl), null)
+  // A link with no stated price.
+  assert.equal(parseSiteManagerManifest(manifest({
+    ...base,
+    releases: [{ ...validRelease, buyUrl: "https://buy.stripe.com/test_abc123" }],
+  }), manifestUrl), null)
+  // Plain http is not an acceptable checkout link.
+  assert.equal(parseSiteManagerManifest(manifest({
+    ...base,
+    releases: [{ ...pricedRelease, buyUrl: "http://buy.stripe.com/test_abc123" }],
+  }), manifestUrl), null)
+  // Same all-or-nothing rule as "price" above: the key must be present, even
+  // when the value would be null.
+  const { buyUrl: _buyUrl, ...noBuyUrl } = pricedRelease
+  assert.equal(parseSiteManagerManifest(manifest({
+    ...base,
+    releases: [noBuyUrl],
   }), manifestUrl), null)
 })
 
