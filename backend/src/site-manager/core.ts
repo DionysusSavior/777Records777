@@ -9,7 +9,7 @@ export const SITE_MANAGER_PROTOCOL = "om7.site-manager"
 export const SITE_MANAGER_VERSION = 1
 export const MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024
 
-export type MediaKind = "audio" | "reel" | "video"
+export type MediaKind = "audio" | "reel" | "video" | "artwork" | "bundle"
 
 export type BeginUploadInput = {
   filename?: unknown
@@ -81,6 +81,10 @@ const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> =
   "video/mp4": { extension: "mp4", kinds: ["reel", "video"] },
   "video/quicktime": { extension: "mov", kinds: ["reel", "video"] },
   "video/webm": { extension: "webm", kinds: ["reel", "video"] },
+  "image/jpeg": { extension: "jpg", kinds: ["artwork"] },
+  "image/png": { extension: "png", kinds: ["artwork"] },
+  "image/webp": { extension: "webp", kinds: ["artwork"] },
+  "application/octet-stream": { extension: "om7", kinds: ["bundle"] },
 }
 
 export class SiteManagerError extends Error {
@@ -181,8 +185,14 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
     requireAuthorization(authorization, config)
 
     const mediaKind = raw.mediaKind
-    if (mediaKind !== "audio" && mediaKind !== "reel" && mediaKind !== "video") {
-      throw new SiteManagerError(400, "invalid_request", "mediaKind must be audio, reel, or video.")
+    if (
+      mediaKind !== "audio" &&
+      mediaKind !== "reel" &&
+      mediaKind !== "video" &&
+      mediaKind !== "artwork" &&
+      mediaKind !== "bundle"
+    ) {
+      throw new SiteManagerError(400, "invalid_request", "mediaKind must be audio, reel, video, artwork, or bundle.")
     }
 
     const contentType = typeof raw.contentType === "string"
@@ -270,7 +280,9 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       publicUrl: receipt.publicUrl,
       // Version 1's smallest useful audio case has no generated landing page.
       // A richer adapter may later make this a site page instead of the object.
-      downloadUrl: receipt.mediaKind === "audio" ? receipt.publicUrl : undefined,
+      downloadUrl: receipt.mediaKind === "audio" || receipt.mediaKind === "bundle"
+        ? receipt.publicUrl
+        : undefined,
       mediaKind: receipt.mediaKind,
       contentType: receipt.contentType,
       contentLength: receipt.contentLength,

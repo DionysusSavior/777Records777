@@ -93,8 +93,26 @@ describe("Site Manager protocol core", () => {
 
     await expect(manager.begin(`Bearer ${token}`, {
       ...validRequest,
+      mediaKind: "artwork",
+      contentType: "image/svg+xml",
+    })).rejects.toMatchObject({ status: 415, code: "unsupported_media_type" })
+
+    await expect(manager.begin(`Bearer ${token}`, {
+      ...validRequest,
       mediaKind: "video",
     })).rejects.toMatchObject({ status: 415, code: "unsupported_media_type" })
+  })
+
+  it("accepts a .om7 bundle served as octet-stream", async () => {
+    const { manager, issued } = makeManager()
+    const begun = await manager.begin(`Bearer ${token}`, {
+      ...validRequest,
+      filename: "In Time.om7",
+      mediaKind: "bundle",
+      contentType: "application/octet-stream",
+    })
+    expect(issued()?.key).toMatch(/^site-manager\/[0-9a-f-]+\.om7$/)
+    expect(begun.upload.headers["content-type"]).toBe("application/octet-stream")
   })
 
   it("rejects a forged receipt and a mismatched stored object", async () => {
