@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { Children, useRef } from "react"
 import {
   motion,
   useScroll,
@@ -52,6 +52,25 @@ export default function ScrollRail({
     clamp: true,
   })
 
+  /**
+   * One rail cell per CARD, however the caller grouped them.
+   *
+   * This used to branch on `Array.isArray(children)` and map it directly,
+   * which is only right when the caller passes exactly one array. The sound
+   * shelf passes two - the artist's own manifest releases, then the commerce
+   * products - so `children` was an array OF ARRAYS, and each rail cell was
+   * handed a whole group. Every card in a group stacked inside one cell and
+   * overlapped the next, under an `overflow-y-hidden` row that clipped what
+   * was left. It read as a rendering fault, which is what Dion saw on
+   * 777records777.studio.
+   *
+   * `Children.toArray` flattens nested arrays and fragments, drops null and
+   * false so a conditional card leaves no empty cell, and assigns stable keys
+   * - which also retires the index key below, wrong the moment a rail is
+   * filtered or reordered.
+   */
+  const cards = Children.toArray(children)
+
   return (
     <div className="relative">
       <motion.div
@@ -59,17 +78,15 @@ export default function ScrollRail({
         style={{ skewX: skew }}
         className={`flex snap-x snap-mandatory gap-6 overflow-x-auto overflow-y-hidden pb-6 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden motion-reduce:!skew-x-0 ${className}`}
       >
-        {Array.isArray(children)
-          ? children.map((child, i) => (
-              <motion.div
-                key={i}
-                style={{ rotate: lean, scaleY: squeeze }}
-                className="w-[68vw] shrink-0 snap-start small:w-[38vw] medium:w-[22vw] motion-reduce:!rotate-0 motion-reduce:!scale-y-100"
-              >
-                {child}
-              </motion.div>
-            ))
-          : children}
+        {cards.map((child, i) => (
+          <motion.div
+            key={typeof child === "object" && child !== null && "key" in child ? child.key : i}
+            style={{ rotate: lean, scaleY: squeeze }}
+            className="w-[68vw] shrink-0 snap-start small:w-[38vw] medium:w-[22vw] motion-reduce:!rotate-0 motion-reduce:!scale-y-100"
+          >
+            {child}
+          </motion.div>
+        ))}
       </motion.div>
 
       {/* The row runs off both edges rather than ending in a wall, so it reads
