@@ -121,6 +121,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  /**
+   * Site-level pages that are not storefront pages, so they take no country.
+   *
+   * `/.well-known/*` already slips past the check above only because it
+   * contains a dot, which is luck rather than intent. `/om7-credential` has no
+   * dot and would otherwise be redirected to `/us/om7-credential` — and the
+   * OM7 app requires the credential link to be on the proved domain at an
+   * exact host and path, so a redirect to a country-prefixed URL is not the
+   * same link and the artist ends up somewhere they were not sent.
+   */
+  if (
+    request.nextUrl.pathname === "/om7-credential" ||
+    request.nextUrl.pathname.startsWith("/.well-known/")
+  ) {
+    return NextResponse.next()
+  }
+
   const cacheIdCookie = request.cookies.get("_medusa_cache_id")
   const cacheId = cacheIdCookie?.value || crypto.randomUUID()
 
