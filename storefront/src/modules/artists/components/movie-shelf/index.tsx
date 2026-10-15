@@ -1,10 +1,9 @@
 import type { Movie } from "@lib/artists"
 import ScrollRail from "@modules/common/components/scroll-rail"
 
+// Decimal units, because that is what Finder and the iPhone Files app report.
 const formatSize = (bytes: number) =>
-  bytes >= 1024 ** 3
-    ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
-    : `${Math.round(bytes / 1024 ** 2)} MB`
+  bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`
 
 /**
  * The full videos, played where they sit, with the file one click away.
@@ -48,7 +47,7 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
                 <path d="M5 21h14" />
               </svg>
               Download
-              <span className="font-normal opacity-60">{formatSize(movie.bytes)}</span>
+              <span className="hidden font-normal opacity-60 small:inline">{formatSize(movie.bytes)}</span>
             </a>
           </div>
         </div>

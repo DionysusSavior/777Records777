@@ -17,27 +17,49 @@ type SoundDownload = {
    * render.
    */
   om7PlayerUrl?: string
+  /**
+   * What Play streams: a 256 kbps AAC copy of `url`, about a tenth its size.
+   * The WAV stays the download; streaming it costs a phone ~15 MB a minute.
+   */
+  streamUrl?: string
 }
+
+const STREAMS = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/streams"
 
 const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
   prod_01KG8CPWZ9T008217JZYTM3EKW: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess+of+Love+(feat.+Kap+G).wav",
     label: "Download Goddess Of Love",
+    streamUrl: `${STREAMS}/goddess-of-love.m4a`,
     om7PlayerUrl: "",
   },
   prod_01KJAM74E83E3PEHKTZNSDEGRV: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.wav",
     label: "Download Gone Crazy",
+    streamUrl: `${STREAMS}/gone-crazy.m4a`,
     om7PlayerUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Gone%20Crazy.om7",
   },
   prod_01KQAK7DCK4SFVFGHXSYPHXBB1: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New+Deal-+master.wav",
     label: "Download New Deal",
+    streamUrl: `${STREAMS}/new-deal.m4a`,
     om7PlayerUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/New%20Deal.om7",
   },
 }
+
+/**
+ * Streaming copies for Site Manager releases, keyed by the manifest's audio
+ * item id. The manifest has no field for one, so a release published without
+ * an entry here still plays - it streams its own audio file instead.
+ */
+const MANIFEST_STREAMS: Record<string, string> = {
+  "8db3c249-35c0-484e-b6c4-de2faf60a076": `${STREAMS}/in-time.m4a`, // In Time
+}
+
+export const getManifestStreamUrl = (audioItemId: string): string | undefined =>
+  MANIFEST_STREAMS[audioItemId.toLowerCase()]
 
 export const SOUND_PRODUCT_IDS = Object.keys(SOUND_DOWNLOADS)
 

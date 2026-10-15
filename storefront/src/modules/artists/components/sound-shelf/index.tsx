@@ -1,6 +1,10 @@
 import { listProductsWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
-import { getSoundDownload, getArtworkRotationClassName } from "@lib/sounds"
+import {
+  getSoundDownload,
+  getArtworkRotationClassName,
+  getManifestStreamUrl,
+} from "@lib/sounds"
 import {
   getSiteManagerShelf,
   type SiteManagerManifestItem,
@@ -8,6 +12,11 @@ import {
 } from "@lib/site-manager-manifest"
 import ScrollRail from "@modules/common/components/scroll-rail"
 import Thumbnail from "@modules/products/components/thumbnail"
+import {
+  PlayableArtwork,
+  PlayButton,
+  type PlayableTrack,
+} from "@modules/artists/components/sound-player/context"
 
 /**
  * The releases, as playing panels, with the file one click away.
@@ -101,18 +110,31 @@ export default async function SoundShelf({
         const stills = product.images?.filter((img) => !isVideo(img.url)) ?? []
         const videos = product.images?.filter((img) => isVideo(img.url)) ?? []
         const preferred = stills.length > 0 ? stills : videos
+        const track: PlayableTrack | null = download
+          ? {
+              id: product.id,
+              title: product.title,
+              audioUrl: download.streamUrl ?? download.url,
+              mediaUrl: product.thumbnail ?? preferred[0]?.url,
+              mediaClassName: getArtworkRotationClassName(product),
+              downloadUrl: download.url,
+            }
+          : null
 
         return (
           <div key={product.id} data-testid="sound-wrapper">
-            <Thumbnail
-              thumbnail={product.thumbnail}
-              images={preferred}
-              size="square"
-              isFeatured
-              mediaClassName={getArtworkRotationClassName(product)}
-            />
+            <PlayableArtwork id={product.id}>
+              <Thumbnail
+                thumbnail={product.thumbnail}
+                images={preferred}
+                size="square"
+                isFeatured
+                mediaClassName={getArtworkRotationClassName(product)}
+              />
+            </PlayableArtwork>
 
             <div className="mt-4 flex items-center justify-between gap-3">
+              {track && <PlayButton track={track} />}
               <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
                 {product.title}
               </span>
@@ -173,17 +195,29 @@ function ManifestRelease({
     : reel
       ? [{ url: reel.url }]
       : []
+  const track: PlayableTrack | null = audio
+    ? {
+        id: release.id,
+        title: release.title,
+        audioUrl: getManifestStreamUrl(audio.id) ?? audio.url,
+        mediaUrl: images[0]?.url,
+        downloadUrl: download?.url,
+      }
+    : null
 
   return (
     <div data-testid="site-manager-release-wrapper">
-      <Thumbnail
-        images={images}
-        size="square"
-        isFeatured
-        placeholder={images.length === 0 ? "audio" : "image"}
-      />
+      <PlayableArtwork id={release.id}>
+        <Thumbnail
+          images={images}
+          size="square"
+          isFeatured
+          placeholder={images.length === 0 ? "audio" : "image"}
+        />
+      </PlayableArtwork>
 
       <div className="mt-4 flex items-center justify-between gap-3">
+        {track && <PlayButton track={track} />}
         <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
           {release.title}
         </span>
@@ -227,16 +261,29 @@ function ManifestRelease({
 }
 
 function ManifestSound({ item }: { item: SiteManagerManifestItem }) {
+  const track: PlayableTrack | null =
+    item.kind === "audio"
+      ? {
+          id: item.id,
+          title: item.title,
+          audioUrl: getManifestStreamUrl(item.id) ?? item.url,
+          downloadUrl: item.url,
+        }
+      : null
+
   return (
     <div data-testid="site-manager-sound-wrapper">
-      <Thumbnail
-        images={item.kind === "video" ? [{ url: item.url }] : []}
-        size="square"
-        isFeatured
-        placeholder={item.kind === "audio" ? "audio" : "image"}
-      />
+      <PlayableArtwork id={item.id}>
+        <Thumbnail
+          images={item.kind === "video" ? [{ url: item.url }] : []}
+          size="square"
+          isFeatured
+          placeholder={item.kind === "audio" ? "audio" : "image"}
+        />
+      </PlayableArtwork>
 
       <div className="mt-4 flex items-center justify-between gap-3">
+        {track && <PlayButton track={track} />}
         <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
           {item.title}
         </span>

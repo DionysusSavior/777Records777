@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import ArtistHero from "@modules/artists/components/artist-hero"
 import SoundShelf from "@modules/artists/components/sound-shelf"
 import MovieShelf from "@modules/artists/components/movie-shelf"
+import { SoundPlayerProvider } from "@modules/artists/components/sound-player/context"
 import UniformShelf from "@modules/artists/components/uniform-shelf"
 import FeatureRequest from "@modules/artists/components/feature-request"
 import Om7PlayerSection from "@modules/artists/components/om7player-section"
@@ -62,7 +63,7 @@ export default async function ArtistPage(props: Props) {
   }
 
   return (
-    <>
+    <SoundPlayerProvider accent={artist.glow} artistName={artist.name}>
       <ArtistHero artist={artist} />
 
       <Section title="Sounds" note="Free to download. The files are yours once you have them.">
@@ -93,6 +94,6 @@ export default async function ArtistPage(props: Props) {
       <Section title="OM7Player" note="Your library on your phone, plus notes, projects and budgets — and a directory of independent artists who own their own sites. No account to play, no ads, no subscriptions.">
         <Om7PlayerSection />
       </Section>
-    </>
+    </SoundPlayerProvider>
   )
 }
