@@ -175,15 +175,7 @@ export async function middleware(request: NextRequest) {
 
   // URL already has a country code
   if (urlHasCountryCode) {
-    if (cacheIdCookie) {
-      return NextResponse.next()
-    }
-
-    const res = NextResponse.redirect(request.nextUrl.href, 307)
-    res.cookies.set("_medusa_cache_id", cacheId, {
-      maxAge: 60 * 60 * 24,
-    })
-    return res
+    return cacheIdCookie ? NextResponse.next() : serveWithCacheId(request, cacheId)
   }
 
   const redirectPath =
@@ -216,7 +208,7 @@ function regionFallback(
     ?.toLowerCase() === DEFAULT_REGION.toLowerCase()
 
   if (urlHasCountryCode) {
-    return NextResponse.next()
+    return hasCookie ? NextResponse.next() : serveWithCacheId(request, cacheId)
   }
 
   const path = request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
@@ -230,6 +222,26 @@ function regionFallback(
   if (!hasCookie) {
     res.cookies.set("_medusa_cache_id", cacheId, { maxAge: 60 * 60 * 24 })
   }
+  return res
+}
+
+/**
+ * Serve the page and hand out the cache id in the same response.
+ *
+ * NEVER REDIRECT A URL TO ITSELF TO SET A COOKIE. A client that does not keep
+ * cookies - Googlebot, link-preview bots, uptime probes, curl - gets the same
+ * 307 back forever and never sees the page, so the site is invisible to search
+ * and every shared link unfurls blank. The id is also written onto the
+ * forwarded request so this first render is cache-scoped like later ones.
+ */
+function serveWithCacheId(request: NextRequest, cacheId: string) {
+  const headers = new Headers(request.headers)
+  const existing = headers.get("cookie")
+  const pair = `_medusa_cache_id=${cacheId}`
+  headers.set("cookie", existing ? `${existing}; ${pair}` : pair)
+
+  const res = NextResponse.next({ request: { headers } })
+  res.cookies.set("_medusa_cache_id", cacheId, { maxAge: 60 * 60 * 24 })
   return res
 }
 
