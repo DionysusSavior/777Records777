@@ -8,6 +8,7 @@ import CartMismatchBanner from "@modules/layout/components/cart-mismatch-banner"
 import Footer from "@modules/layout/templates/footer"
 import Nav from "@modules/layout/templates/nav"
 import FreeShippingPriceNudge from "@modules/shipping/components/free-shipping-price-nudge"
+import PriorityList from "@modules/common/components/priority-list"
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
@@ -37,7 +38,13 @@ async function orNull<T>(work: Promise<T>, what: string): Promise<T | null> {
   }
 }
 
-export default async function PageLayout(props: { children: React.ReactNode }) {
+export default async function PageLayout(props: {
+  children: React.ReactNode
+  params: Promise<{ countryCode: string }>
+}) {
+  // Read for one reason: whether the consent box may start ticked. It is a
+  // legal question, not a preference. See the priority-list component.
+  const { countryCode } = await props.params
   const customer = await orNull(retrieveCustomer(), "customer")
   const cart = await orNull(retrieveCart(), "cart")
   let shippingOptions: StoreCartShippingOption[] = []
@@ -65,6 +72,10 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
       )}
       {props.children}
       <Footer />
+
+      {/* Site-wide, because it listens for any download link and because the
+          way back to it should not disappear when somebody changes page. */}
+      <PriorityList countryCode={countryCode} />
     </div>
   )
 }
