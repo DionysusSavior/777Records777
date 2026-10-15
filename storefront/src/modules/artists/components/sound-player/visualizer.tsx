@@ -14,8 +14,8 @@ const rgbOf = (color: string): [number, number, number] => {
 }
 
 /**
- * Frequency bars bursting outward from a ring around the panel, bass at the
- * bottom and highs at the top, mirrored left to right.
+ * A luminous, audio-driven corona: mirrored frequency bars, orbiting ribbons
+ * and a dust halo. Motion follows actual energy, not a fake idle beat.
  *
  * The ring is re-centred on the panel's live box every frame, so during the
  * flight in from the rail it travels and grows with the panel rather than
@@ -45,6 +45,11 @@ export default function RingVisualizer({
     const levels = new Float32Array(BARS_PER_SIDE)
     let bins: Uint8Array<ArrayBuffer> | null = null
     let frame = 0
+    let previous = 0
+    let phase = 0
+    let envelope = 0
+    const pulseElement = pulse.current
+    const tint = (alpha: number) => `rgba(${r}, ${g}, ${b}, ${alpha})`
 
     const fit = () => {
       const scale = Math.min(window.devicePixelRatio || 1, 2)
@@ -53,7 +58,9 @@ export default function RingVisualizer({
       context.setTransform(scale, 0, 0, scale, 0, 0)
     }
 
-    const draw = () => {
+    const draw = (now = 0) => {
+      const dt = Math.min(Math.max((now - previous) / 1000, 0), 0.05)
+      previous = now
       const node = analyser.current
       if (node && !still) {
         if (bins?.length !== node.frequencyBinCount) bins = new Uint8Array(node.frequencyBinCount)
@@ -65,22 +72,57 @@ export default function RingVisualizer({
       if (box && box.width > 0) {
         const cx = box.left + box.width / 2
         const cy = box.top + box.height / 2
-        const ring = box.width * 0.74
-        const reach = box.width * 0.3
+        // Keep the brightest geometry inside a phone viewport. The soft halo
+        // may spill, but the spectrum should not be chopped off at both sides.
+        const ring = Math.min(box.width * 0.74, window.innerWidth * 0.38)
+        const reach = Math.min(box.width * 0.3, window.innerWidth * 0.1)
 
         let bass = 0
         if (bins) {
           for (let i = 1; i < 7; i++) bass += bins[i]
           bass /= 6 * 255
         }
+        envelope += (bass - envelope) * (1 - Math.exp(-dt * (bass > envelope ? 18 : 5)))
+        if (!still) phase += dt * envelope * 0.55
 
-        const glow = context.createRadialGradient(cx, cy, box.width * 0.3, cx, cy, ring + reach)
-        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.12 + bass * 0.4})`)
-        glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
+        const glow = context.createRadialGradient(cx, cy, ring * 0.4, cx, cy, ring + reach * 2)
+        glow.addColorStop(0, tint(0.03))
+        glow.addColorStop(0.55, tint(0.08 + envelope * 0.2))
+        glow.addColorStop(1, tint(0))
         context.fillStyle = glow
         context.beginPath()
-        context.arc(cx, cy, (ring + reach) * (1 + bass * 0.12), 0, Math.PI * 2)
+        context.arc(cx, cy, ring + reach * 2, 0, Math.PI * 2)
         context.fill()
+
+        context.save()
+        context.globalCompositeOperation = "lighter"
+        // Thin counter-rotating ribbons give the spectrum depth without
+        // expensive full-screen blurs or an ever-growing particle system.
+        for (let ribbon = 0; ribbon < 3; ribbon++) {
+          context.beginPath()
+          for (let point = 0; point <= 192; point++) {
+            const angle = (point / 192) * Math.PI * 2
+            const wave = Math.sin(angle * (3 + ribbon) + phase * (ribbon % 2 ? -2 : 2) + ribbon * 2)
+            const radius = ring - 8 - ribbon * 5 + wave * (2 + envelope * 12)
+            const px = cx + Math.cos(angle) * radius
+            const py = cy + Math.sin(angle) * radius
+            if (point === 0) context.moveTo(px, py)
+            else context.lineTo(px, py)
+          }
+          context.closePath()
+          context.strokeStyle = ribbon === 0 ? `rgba(235,245,255,${0.2 + envelope * 0.35})` : tint(0.16 + envelope * 0.25)
+          context.lineWidth = ribbon === 0 ? 1.5 : 0.8
+          context.stroke()
+        }
+
+        for (let mote = 0; mote < 48; mote++) {
+          const angle = mote * 2.399963 + phase * (mote % 2 ? 1 : -0.6)
+          const radius = ring + reach * (0.25 + ((mote * 17) % 47) / 47)
+          context.fillStyle = tint(0.12 + envelope * (0.2 + (mote % 4) * 0.1))
+          context.beginPath()
+          context.arc(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 0.6 + (mote % 3) * 0.4, 0, Math.PI * 2)
+          context.fill()
+        }
 
         context.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.22)`
         context.lineWidth = 1
@@ -102,7 +144,7 @@ export default function RingVisualizer({
             for (let k = lo; k < hi; k++) sum += bins[k] ?? 0
             level = Math.pow(sum / ((hi - lo) * 255), 1.5)
           }
-          levels[i] = level > levels[i] ? level : levels[i] * 0.9 + level * 0.1
+          levels[i] = level > levels[i] ? level : levels[i] + (level - levels[i]) * (1 - Math.exp(-dt * 6))
 
           const length = 4 + levels[i] * reach
           // Brighter toward white as a bar rises, so peaks read as light.
@@ -119,10 +161,25 @@ export default function RingVisualizer({
             context.moveTo(cx + cos * ring, cy + sin * ring)
             context.lineTo(cx + cos * (ring + length), cy + sin * (ring + length))
             context.stroke()
+            // A broad translucent sheath and a hot tip read as neon, while
+            // avoiding per-bar shadowBlur on mobile GPUs.
+            const width = context.lineWidth
+            context.globalAlpha = 0.13
+            context.lineWidth = width * 3
+            context.stroke()
+            context.globalAlpha = 1
+            context.lineWidth = width
+            if (levels[i] > 0.25) {
+              context.fillStyle = `rgba(245,250,255,${levels[i] * 0.85})`
+              context.beginPath()
+              context.arc(cx + cos * (ring + length), cy + sin * (ring + length), width * 0.5, 0, Math.PI * 2)
+              context.fill()
+            }
           }
         }
 
-        if (pulse.current) pulse.current.style.transform = `scale(${1 + bass * 0.045})`
+        context.restore()
+        if (pulse.current) pulse.current.style.transform = `scale(${1 + envelope * 0.055})`
       }
 
       if (!still) frame = requestAnimationFrame(draw)
@@ -139,6 +196,7 @@ export default function RingVisualizer({
     return () => {
       cancelAnimationFrame(frame)
       window.removeEventListener("resize", refit)
+      if (pulseElement) pulseElement.style.transform = ""
     }
   }, [accent, analyser, panel, pulse, still])
 
