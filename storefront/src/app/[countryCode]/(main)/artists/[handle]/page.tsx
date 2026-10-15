@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import ArtistHero from "@modules/artists/components/artist-hero"
 import SoundShelf from "@modules/artists/components/sound-shelf"
+import MovieShelf from "@modules/artists/components/movie-shelf"
 import UniformShelf from "@modules/artists/components/uniform-shelf"
 import FeatureRequest from "@modules/artists/components/feature-request"
 import Om7PlayerSection from "@modules/artists/components/om7player-section"
@@ -71,6 +72,12 @@ export default async function ArtistPage(props: Props) {
           manifestUrl={artist.manifestUrl}
         />
       </Section>
+
+      {artist.movies.length > 0 && (
+        <Section title="Movies" note="Watch it here, or download the file and keep it.">
+          <MovieShelf movies={artist.movies} />
+        </Section>
+      )}
 
       <Section title="Uniforms">
         <UniformShelf countryCode={countryCode} productIds={artist.uniformIds} />

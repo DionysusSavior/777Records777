@@ -9,6 +9,23 @@
  * Adding an artist is adding an entry here plus a photo in /public/artists.
  * Re-filing a release is moving its product id from one `soundIds` to another.
  */
+/**
+ * A full-length video, watched on the page and downloadable as the file.
+ *
+ * Listed here rather than in the Site Manager manifest: that manifest is
+ * rewritten whole by the OM7 app on every publish and knows only releases
+ * (a sound with its reel), so a hand-added movie there is one publish away
+ * from being deleted. The file must be uploaded with
+ * `Content-Disposition: attachment` - the bucket is another origin, and
+ * browsers ignore the `download` attribute across origins and just play it.
+ */
+export type Movie = {
+  title: string
+  url: string
+  poster: string
+  bytes: number
+}
+
 export type Artist = {
   handle: string
   name: string
@@ -50,7 +67,10 @@ export type Artist = {
   soundIds: string[]
   uniformIds: string[]
   amuletIds: string[]
+  movies: Movie[]
 }
+
+const ASSETS = "https://777records777productpageassets.s3.us-east-2.amazonaws.com"
 
 // Label merch rather than any one artist's, so both panels carry it. Split it
 // into per-artist lists the day either of them presses their own run.
@@ -85,6 +105,7 @@ export const ARTISTS: Artist[] = [
     ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
+    movies: [],
   },
   {
     handle: "dionysus-savior",
@@ -106,6 +127,14 @@ export const ARTISTS: Artist[] = [
     ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
+    movies: [
+      {
+        title: "DIONYSUS SAVIOR - IN TIME",
+        url: `${ASSETS}/movies/dion/in-time.mp4`,
+        poster: `${ASSETS}/movies/dion/in-time.jpg`,
+        bytes: 250_022_598,
+      },
+    ],
   },
 ]
 
