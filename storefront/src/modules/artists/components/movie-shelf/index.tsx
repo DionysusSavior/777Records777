@@ -27,11 +27,12 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
             controls
             playsInline
             preload="none"
-            className="aspect-[9/16] w-full rounded-large bg-black object-cover"
+            style={{ aspectRatio: movie.aspectRatio ?? "9 / 16" }}
+            className="w-full rounded-large bg-black object-contain"
           />
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className="luxury-title min-w-0 flex-1 truncate text-[0.86rem] tracking-[0.045em] text-white">
+          <div className="mt-4 flex flex-col items-start gap-3">
+            <span className="luxury-title text-[0.86rem] leading-relaxed tracking-[0.045em] text-white">
               {movie.title}
             </span>
 
@@ -47,7 +48,7 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
                 <path d="M5 21h14" />
               </svg>
               Download
-              <span className="hidden font-normal opacity-60 small:inline">{formatSize(movie.bytes)}</span>
+              <span className="font-normal opacity-60">{formatSize(movie.bytes)}</span>
             </a>
           </div>
         </div>

@@ -24,6 +24,8 @@ export type Movie = {
   url: string
   poster: string
   bytes: number
+  /** Preserve the film's framing; older entries default to portrait. */
+  aspectRatio?: string
 }
 
 export type Artist = {
@@ -86,6 +88,24 @@ const LABEL_SOUNDS = [
   "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
 ]
 
+// Both director's cuts belong on both artists' pages, using the same files.
+const NEW_DEAL_MOVIES: Movie[] = [
+  {
+    title: "777Records777 - New Deal (Viz's Director's Cut)",
+    url: `${ASSETS}/movies/viz/new-deal-viz-cut.mp4`,
+    poster: `${ASSETS}/movies/viz/new-deal-viz-cut.jpg`,
+    bytes: 16_065_826,
+    aspectRatio: "16 / 9",
+  },
+  {
+    title: "777Records777 - New Deal (Dion's Director's Cut)",
+    url: `${ASSETS}/movies/viz/new-deal-dion-cut.mp4`,
+    poster: `${ASSETS}/movies/viz/new-deal-dion-cut.jpg`,
+    bytes: 18_493_297,
+    aspectRatio: "16 / 9",
+  },
+]
+
 export const ARTISTS: Artist[] = [
   {
     handle: "viz",
@@ -105,7 +125,23 @@ export const ARTISTS: Artist[] = [
     ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
-    movies: [],
+    movies: [
+      {
+        title: "Viz - Time Machine (Viz's Director's Cut)",
+        url: `${ASSETS}/movies/viz/time-machine-viz-cut.mp4`,
+        poster: `${ASSETS}/movies/viz/time-machine-viz-cut.jpg`,
+        bytes: 20_141_751,
+        aspectRatio: "16 / 9",
+      },
+      {
+        title: "Viz - Time Machine (Shot by Criz Director's Cut)",
+        url: `${ASSETS}/movies/viz/time-machine-criz-cut.mp4`,
+        poster: `${ASSETS}/movies/viz/time-machine-criz-cut.jpg`,
+        bytes: 15_894_138,
+        aspectRatio: "16 / 9",
+      },
+      ...NEW_DEAL_MOVIES,
+    ],
   },
   {
     handle: "dionysus-savior",
@@ -134,6 +170,7 @@ export const ARTISTS: Artist[] = [
         poster: `${ASSETS}/movies/dion/in-time.jpg`,
         bytes: 250_022_598,
       },
+      ...NEW_DEAL_MOVIES,
     ],
   },
 ]
