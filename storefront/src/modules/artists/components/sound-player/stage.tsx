@@ -1,21 +1,12 @@
 "use client"
 
-import { animate, motion, useMotionValue, useReducedMotion } from "motion/react"
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { motion } from "motion/react"
+import { useCallback, useEffect, useRef } from "react"
 
+import { useStageFlight } from "@modules/artists/components/stage-flight"
 import { PlayIcon, useAudioTime, useSoundPlayer, type PlayableTrack } from "./context"
 import TrackMedia from "./media"
 import RingVisualizer from "./visualizer"
-
-const OPEN = { type: "spring", stiffness: 170, damping: 24, mass: 0.9 } as const
-const CLOSE = { duration: 0.42, ease: [0.32, 0.72, 0, 1] } as const
-
-const onScreen = (rect: DOMRect) =>
-  rect.width > 0 &&
-  rect.bottom > 0 &&
-  rect.right > 0 &&
-  rect.top < window.innerHeight &&
-  rect.left < window.innerWidth
 
 const clock = (seconds: number) => {
   const whole = Math.max(0, Math.floor(seconds))
@@ -38,102 +29,40 @@ export default function Stage() {
  */
 function StageView({ track }: { track: PlayableTrack }) {
   const player = useSoundPlayer()
-  const reduce = useReducedMotion() ?? false
-  const panel = useRef<HTMLDivElement>(null)
   const pulse = useRef<HTMLDivElement>(null)
-  const closing = useRef(false)
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
-  const scaleX = useMotionValue(1)
-  const scaleY = useMotionValue(1)
-  const panelOpacity = useMotionValue(1)
-  const shade = useMotionValue(0)
 
-  /** The offset that puts the centred panel exactly over `rect`. */
-  const toward = useCallback(
-    (rect: DOMRect) => {
-      const element = panel.current!
-      const box = element.getBoundingClientRect()
-      const homeX = box.left + box.width / 2 - x.get()
-      const homeY = box.top + box.height / 2 - y.get()
-      return {
-        x: rect.left + rect.width / 2 - homeX,
-        y: rect.top + rect.height / 2 - homeY,
-        scaleX: rect.width / element.offsetWidth,
-        scaleY: rect.height / element.offsetHeight,
-      }
-    },
-    [x, y]
+  /**
+   * Where this panel flies from and back to.
+   *
+   * Read on demand, never captured: `origin` is set when something other than
+   * the panel opened the stage - the mini player, say - and the rail can be
+   * scrolled while the stage is open, so the slot is often somewhere else by
+   * the time the panel goes home.
+   */
+  const home = useCallback(
+    () => player.origin.current ?? player.panelOf(track.id),
+    [player, track.id]
   )
+  const { panel, close, reduce, style, shade } = useStageFlight({
+    home,
+    onClosed: player.hideStage,
+  })
 
-  useLayoutEffect(() => {
-    const from = (player.origin.current ?? player.panelOf(track.id))?.getBoundingClientRect()
-    animate(shade, 1, { duration: 0.35 })
-
-    if (!reduce && from && onScreen(from)) {
-      const start = toward(from)
-      x.set(start.x)
-      y.set(start.y)
-      scaleX.set(start.scaleX)
-      scaleY.set(start.scaleY)
-      animate(x, 0, OPEN)
-      animate(y, 0, OPEN)
-      animate(scaleX, 1, OPEN)
-      animate(scaleY, 1, OPEN)
-    } else {
-      scaleX.set(0.94)
-      scaleY.set(0.94)
-      panelOpacity.set(0)
-      animate(scaleX, 1, { duration: 0.3 })
-      animate(scaleY, 1, { duration: 0.3 })
-      animate(panelOpacity, 1, { duration: 0.3 })
-    }
-    // Opening runs once per mount; the stage is keyed by track.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const close = useCallback(async () => {
-    if (closing.current) return
-    closing.current = true
-    const to = player.panelOf(track.id)?.getBoundingClientRect()
-    const fade = animate(shade, 0, { duration: 0.32 })
-
-    if (!reduce && to && onScreen(to)) {
-      const end = toward(to)
-      await Promise.all([
-        animate(x, end.x, CLOSE),
-        animate(y, end.y, CLOSE),
-        animate(scaleX, end.scaleX, CLOSE),
-        animate(scaleY, end.scaleY, CLOSE),
-        fade,
-      ])
-    } else {
-      await Promise.all([
-        animate(scaleX, 0.94, { duration: 0.25 }),
-        animate(scaleY, 0.94, { duration: 0.25 }),
-        animate(panelOpacity, 0, { duration: 0.25 }),
-        fade,
-      ])
-    }
-    player.hideStage()
-  }, [player, track.id, reduce, toward, x, y, scaleX, scaleY, panelOpacity, shade])
-
+  /**
+   * Space toggles playback, which is this stage's own concern - the shared
+   * flight handles Escape and the scroll lock, because every stage wants
+   * those, and only a stage with a transport wants this one.
+   */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") void close()
       if (event.key === " " && !(event.target instanceof HTMLInputElement)) {
         event.preventDefault()
         player.toggle()
       }
     }
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
     window.addEventListener("keydown", onKey)
-    return () => {
-      document.body.style.overflow = overflow
-      window.removeEventListener("keydown", onKey)
-    }
-  }, [close, player])
+    return () => window.removeEventListener("keydown", onKey)
+  }, [player])
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`Now playing ${track.title}`} className="fixed inset-0 z-[100]">
@@ -147,7 +76,7 @@ function StageView({ track }: { track: PlayableTrack }) {
         <div className="flex flex-1 items-center justify-center">
           <motion.div
             ref={panel}
-            style={{ x, y, scaleX, scaleY, opacity: panelOpacity }}
+            style={style}
             className="pointer-events-auto relative aspect-square w-[min(60vw,40vh,400px)] overflow-hidden rounded-large bg-ui-bg-subtle shadow-[0_30px_120px_rgba(0,0,0,0.6)]"
           >
             <div ref={pulse} className="absolute inset-0 will-change-transform">
