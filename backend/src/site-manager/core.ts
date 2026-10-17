@@ -11,6 +11,31 @@ export const MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024
 
 export type MediaKind = "audio" | "reel" | "video" | "artwork" | "bundle"
 
+/**
+ * The name a browser saves the file as, from a name the client chose.
+ *
+ * The key is a UUID on purpose — see the comment where it is built — so
+ * without this a download arrives called `8db3c249-….wav`, which is not a
+ * song. The display name is the one place the client's filename is allowed to
+ * matter, and it reaches a RESPONSE HEADER, so it is sanitised hard.
+ *
+ * Control characters and CR/LF go first: a newline in a header value is header
+ * injection, and this value is attacker-controlled in the sense that anybody
+ * holding a publishing credential supplies it. Quotes and backslashes go too,
+ * because the ASCII form is a quoted-string and either would end it early.
+ *
+ * Both forms are emitted by the caller: a plain `filename=` that is safe in
+ * any browser, and RFC 6266's `filename*=UTF-8''…` so a name with accents or
+ * non-Latin script survives rather than being flattened to underscores.
+ */
+export const downloadNameFor = (raw: unknown, extension: string): string => {
+  const given = typeof raw === "string" ? raw.trim() : ""
+  // eslint-disable-next-line no-control-regex
+  const cleaned = given.replace(/[\u0000-\u001f\u007f"\\]/g, "").slice(0, 120).trim()
+  if (!cleaned) return `download.${extension}`
+  return cleaned.toLowerCase().endsWith(`.${extension}`) ? cleaned : `${cleaned}.${extension}`
+}
+
 export type BeginUploadInput = {
   filename?: unknown
   mediaKind?: unknown
@@ -25,6 +50,8 @@ export type UploadDescriptor = {
   contentLength: number
   checksumSha256: string
   expiresInSeconds: number
+  /** The name a browser should save the file as. See downloadNameFor. */
+  downloadName: string
 }
 
 export type IssuedUpload = {
@@ -222,6 +249,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
     // path traversal, same-origin HTML/SVG uploads would turn storage into an
     // executable-content surface. The allowlisted MIME type chooses the suffix.
     const key = `${config.keyPrefix}/${randomUUID()}.${type.extension}`
+    const downloadName = downloadNameFor(raw.filename, type.extension)
     const publicUrl = publicUrlFor(config.publicBaseUrl, key)
     const issued = await storage.issueUpload({
       key,
@@ -229,6 +257,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       contentLength,
       checksumSha256,
       expiresInSeconds: config.uploadTtlSeconds,
+      downloadName,
     })
     const receipt: Receipt = {
       v: 1,
