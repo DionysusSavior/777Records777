@@ -3,21 +3,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { getArtist } from "@lib/artists"
 
 /**
- * Takes a feature enquiry and hands it to the backend, which owns the mail
- * credentials.
+ * Takes a feature enquiry and hands it to the mail function.
  *
- * This hop exists so the browser never sees the publishable key or the Resend
- * key, and so the destination address is decided here from the artist handle
- * rather than posted by the client. A form that carried its own recipient
- * would be an open relay wearing a booking form as a disguise.
+ * This hop exists so the browser never sees the function URL, and so the
+ * destination address is decided here from the artist handle rather than
+ * posted by the client. A form that carried its own recipient would be an
+ * open relay wearing a booking form as a disguise. The function checks the
+ * address again; this hop is not the only control.
+ *
+ * FEATURE_REQUEST_URL is the Lambda function URL from MailStack. It is
+ * server-only on purpose. There is no Medusa fallback: a deploy of this
+ * route before that URL is set answers 503 rather than quietly mailing
+ * through Render.
  */
-const BACKEND =
-  process.env.MEDUSA_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
-  "https://seven77records777.onrender.com"
-
-const PUBLISHABLE_KEY =
-  process.env.MEDUSA_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+const FEATURE_REQUEST_URL = process.env.FEATURE_REQUEST_URL ?? ""
 
 /** Matches the cap stated in the form, enforced again because the client can lie. */
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -61,12 +60,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const res = await fetch(`${BACKEND}/store/feature-request`, {
+  if (!FEATURE_REQUEST_URL) {
+    console.error("feature-request: FEATURE_REQUEST_URL is not set")
+    return NextResponse.json({ error: "That did not send. Try again in a moment." }, { status: 503 })
+  }
+
+  const res = await fetch(FEATURE_REQUEST_URL, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(PUBLISHABLE_KEY ? { "x-publishable-api-key": PUBLISHABLE_KEY } : {}),
-    },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       to: artist.bookingEmail,
       artistName: artist.name,

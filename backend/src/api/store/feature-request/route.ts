@@ -1,6 +1,10 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 
 /**
+ * No longer called. The storefront posts to the feature-request Lambda.
+ * Deleted with Render in Phase 4; left here so a revert of the storefront
+ * hop still has a route to land on.
+ *
  * Delivers a feature enquiry to the artist it was addressed to.
  *
  * This lives on the backend for one reason: the Resend key does. The
