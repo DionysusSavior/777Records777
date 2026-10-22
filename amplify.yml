@@ -8,6 +8,21 @@ applications:
             - npm install --include=dev
         build:
           commands:
+            # Amplify hands console variables to the BUILD, not to the SSR
+            # runtime, so a server-only `process.env.X` is undefined at request
+            # time however the variable is scoped - app-level and branch-level
+            # both fail. Next.js DOES inline what it loads from .env.production
+            # into the server bundle, so writing it here is what actually
+            # carries the value into a running route handler.
+            #
+            # Nothing caught this before because every other server-side read
+            # has a hardcoded fallback (see src/lib/config.ts) - the variable
+            # was never load-bearing. FEATURE_REQUEST_URL is the first one that
+            # is, and without this line the booking form answers 503.
+            #
+            # `|| true` so a missing variable does not fail the build; the
+            # route's own guard reports it instead.
+            - env | grep -E '^FEATURE_REQUEST_URL=' >> .env.production || true
             - npm run build
       artifacts:
         baseDirectory: .next
