@@ -253,4 +253,26 @@ check("the shelf hides invisible releases and does not invent them from items", 
   assert.deepEqual(shelfEntriesFrom(empty), [])
 })
 
+check("a movie is a movie, and a missing movies list leaves the sounds alone", () => {
+  const film = {
+    id: "e6f40517-8293-4b1d-8def-0123456789ab",
+    title: "Time Machine",
+    url: "https://artist-bucket.example/site-manager/viz/e6f40517-8293-4b1d-8def-0123456789ab.mp4",
+    poster: "",
+    bytes: 20_000_000,
+    publishedAt: "2026-10-25T12:00:00.000Z",
+  }
+  const parsed = parseSiteManagerManifest(manifest({ movies: [film] }), manifestUrl)
+  assert(parsed)
+  assert.equal(parsed.items.length, 1)
+  assert.equal(parsed.movies?.length, 1)
+  assert.equal(parsed.movies?.[0].poster, "")
+  assert.equal(shelfEntriesFrom(parsed).length, 1)
+
+  const offSite = parseSiteManagerManifest(manifest({
+    movies: [{ ...film, url: "https://evil.example/film.mp4" }],
+  }), manifestUrl)
+  assert.equal(offSite, null)
+})
+
 console.log(`Site Manager manifest parser: ${checks} checks passed`)

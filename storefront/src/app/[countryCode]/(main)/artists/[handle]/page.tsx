@@ -8,7 +8,8 @@ import { SoundPlayerProvider } from "@modules/artists/components/sound-player/co
 import UniformShelf from "@modules/artists/components/uniform-shelf"
 import FeatureRequest from "@modules/artists/components/feature-request"
 import Om7PlayerSection from "@modules/artists/components/om7player-section"
-import { getArtist } from "@lib/artists"
+import { getArtist, type Movie } from "@lib/artists"
+import { getSiteManagerMovies } from "@lib/site-manager-manifest"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
@@ -62,6 +63,22 @@ export default async function ArtistPage(props: Props) {
     notFound()
   }
 
+  // Static films stay even when the manifest cannot be read. Published films
+  // are added beside them and never replace a shared director's cut.
+  const published = await getSiteManagerMovies(artist.manifestUrl)
+  const seen = new Set(artist.movies.map((movie) => movie.url))
+  const movies: Movie[] = [
+    ...artist.movies,
+    ...published
+      .filter((movie) => !seen.has(movie.url))
+      .map((movie) => ({
+        title: movie.title,
+        url: movie.url,
+        poster: movie.poster,
+        bytes: movie.bytes,
+      })),
+  ]
+
   return (
     <SoundPlayerProvider accent={artist.glow} artistName={artist.name}>
       <ArtistHero artist={artist} />
@@ -74,9 +91,9 @@ export default async function ArtistPage(props: Props) {
         />
       </Section>
 
-      {artist.movies.length > 0 && (
+      {movies.length > 0 && (
         <Section title="Movies" note="Watch it here, or download the file and keep it.">
-          <MovieShelf movies={artist.movies} />
+          <MovieShelf movies={movies} />
         </Section>
       )}
 

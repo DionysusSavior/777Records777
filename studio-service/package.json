@@ -1,0 +1,14 @@
+{
+  "name": "studio-service",
+  "private": true,
+  "type": "module",
+  "description": "Artist grants and catalogue publication for 777records777.studio. Not the Medusa process.",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.964.0",
+    "@aws-sdk/client-s3": "^3.964.0",
+    "@aws-sdk/lib-dynamodb": "^3.964.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/studio.test.ts"
+  }
+}

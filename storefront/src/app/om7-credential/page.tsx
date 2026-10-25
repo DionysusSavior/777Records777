@@ -78,6 +78,24 @@ export default function Om7CredentialPage() {
         )}
       </div>
 
+      <div className="flex flex-col gap-3 rounded-lg border border-white/15 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider opacity-60">
+          Studio admin
+        </h2>
+        <p className="text-sm leading-relaxed opacity-70">
+          Granting an artist their own page is a different login, on this
+          site, at studio admin. It does not replace the button above until
+          the publishing service itself moves. Render is still the live
+          publisher.
+        </p>
+        <a
+          href="/studio-admin"
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/10"
+        >
+          Open studio admin
+        </a>
+      </div>
+
       <p className="text-xs leading-relaxed opacity-50">
         The credential is shown once and is never stored by this site — only a
         fingerprint of it is kept, which cannot be used to publish. If it is

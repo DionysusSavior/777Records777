@@ -36,12 +36,21 @@ export const downloadNameFor = (raw: unknown, extension: string): string => {
   return cleaned.toLowerCase().endsWith(`.${extension}`) ? cleaned : `${cleaned}.${extension}`
 }
 
+export type PublishSection = "sounds" | "movies"
+
 export type BeginUploadInput = {
   filename?: unknown
   mediaKind?: unknown
   contentType?: unknown
   contentLength?: unknown
   checksumSha256?: unknown
+  /**
+   * Ignored by the single-prefix manager Render still runs. The studio
+   * service requires it, and the grant — not this string — chooses the prefix.
+   */
+  destinationId?: unknown
+  section?: unknown
+  title?: unknown
 }
 
 export type UploadDescriptor = {
@@ -76,6 +85,35 @@ export interface PublishStorage {
   inspectUpload(key: string): Promise<StoredUpload | null>
 }
 
+/**
+ * What a publishing grant is allowed to touch.
+ *
+ * The caller does not supply the prefix or the public base. Those come from
+ * the destination registry after the token has been resolved, so a body that
+ * names somebody else's artist cannot widen the upload.
+ */
+export type ResolvedGrant = {
+  keyPrefix: string
+  publicBaseUrl: string
+  destinationId: string
+  grantId: string
+  grantVersion: number
+  section: PublishSection
+}
+
+export type PublishedObject = {
+  key: string
+  publicUrl: string
+  mediaKind: MediaKind
+  contentType: string
+  contentLength: number
+  checksumSha256: string
+  downloadName: string
+  title: string
+  destinationId: string
+  section: PublishSection
+}
+
 export type SiteManagerConfig = {
   tokenSha256: string
   receiptSecret: string
@@ -84,10 +122,26 @@ export type SiteManagerConfig = {
   maxBytes: number
   uploadTtlSeconds: number
   receiptTtlSeconds: number
+  /**
+   * Present only on the studio service.
+   *
+   * Render's manager leaves this unset and keeps checking the one configured
+   * digest. Setting it does not make that digest a pass for every artist.
+   */
+  resolveGrant?: (
+    authorization: string | undefined,
+    destinationId: unknown,
+  ) => Promise<ResolvedGrant>
+  /**
+   * Runs after the stored object matches the receipt and before success.
+   * A throw here must leave the object in place so the same receipt can be
+   * completed again without uploading twice.
+   */
+  onPublished?: (published: PublishedObject) => Promise<{ pageUrl: string }>
 }
 
 type Receipt = {
-  v: 1
+  v: 1 | 2
   key: string
   mediaKind: MediaKind
   contentType: string
@@ -95,6 +149,11 @@ type Receipt = {
   checksumSha256: string
   publicUrl: string
   expiresAt: number
+  destinationId?: string
+  grantId?: string
+  grantVersion?: number
+  section?: PublishSection
+  title?: string
 }
 
 const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> = {
@@ -115,12 +174,12 @@ const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> =
 }
 
 export class SiteManagerError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
+  readonly status: number
+  readonly code: string
+  constructor(status: number, code: string, message: string) {
     super(message)
+    this.status = status
+    this.code = code
   }
 }
 
@@ -183,12 +242,18 @@ const decodeReceipt = (value: unknown, secret: string): Receipt => {
 
   try {
     const receipt = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Receipt
-    if (
-      receipt.v !== 1 ||
-      typeof receipt.key !== "string" ||
-      typeof receipt.publicUrl !== "string" ||
-      typeof receipt.expiresAt !== "number"
-    ) {
+    const baseOk = (receipt.v === 1 || receipt.v === 2) &&
+      typeof receipt.key === "string" &&
+      typeof receipt.publicUrl === "string" &&
+      typeof receipt.expiresAt === "number"
+    const grantOk = receipt.v !== 2 || (
+      typeof receipt.destinationId === "string" &&
+      typeof receipt.grantId === "string" &&
+      typeof receipt.grantVersion === "number" &&
+      (receipt.section === "sounds" || receipt.section === "movies") &&
+      typeof receipt.title === "string"
+    )
+    if (!baseOk || !grantOk) {
       throw new Error("bad shape")
     }
     if (receipt.expiresAt < Date.now()) {
@@ -207,9 +272,27 @@ const requireAuthorization = (authorization: string | undefined, config: SiteMan
   }
 }
 
+const titleFor = (raw: unknown, fallback: string) => {
+  const given = typeof raw === "string" ? raw.trim() : ""
+  // eslint-disable-next-line no-control-regex
+  const cleaned = given.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 160).trim()
+  return cleaned || fallback
+}
+
+const sectionAllows = (section: PublishSection, mediaKind: MediaKind) => {
+  if (section === "movies") return mediaKind === "video"
+  return mediaKind !== "video"
+}
+
 export const createSiteManager = (config: SiteManagerConfig, storage: PublishStorage) => ({
   async begin(authorization: string | undefined, raw: BeginUploadInput) {
-    requireAuthorization(authorization, config)
+    // The grant is resolved before any other check so a bad destination never
+    // reaches storage. The single-prefix manager has no resolver and still
+    // checks its one digest before it looks at the file.
+    const scope = config.resolveGrant
+      ? await config.resolveGrant(authorization, raw.destinationId)
+      : null
+    if (!scope) requireAuthorization(authorization, config)
 
     const mediaKind = raw.mediaKind
     if (
@@ -228,6 +311,15 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
     const type = CONTENT_TYPES[contentType]
     if (!type || !type.kinds.includes(mediaKind)) {
       throw new SiteManagerError(415, "unsupported_media_type", "That media type is not supported for this kind of publish.")
+    }
+    if (scope && !sectionAllows(scope.section, mediaKind)) {
+      throw new SiteManagerError(
+        415,
+        "unsupported_media_type",
+        scope.section === "movies"
+          ? "Movies accepts a video. Sounds is a different destination."
+          : "Sounds does not accept a movie. Choose the Movies destination for a film.",
+      )
     }
 
     const contentLength = raw.contentLength
@@ -248,9 +340,12 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
     // The client filename is deliberately not used as a storage key. Besides
     // path traversal, same-origin HTML/SVG uploads would turn storage into an
     // executable-content surface. The allowlisted MIME type chooses the suffix.
-    const key = `${config.keyPrefix}/${randomUUID()}.${type.extension}`
+    const keyPrefix = scope?.keyPrefix ?? config.keyPrefix
+    const publicBaseUrl = scope?.publicBaseUrl ?? config.publicBaseUrl
+    const key = `${keyPrefix}/${randomUUID()}.${type.extension}`
     const downloadName = downloadNameFor(raw.filename, type.extension)
-    const publicUrl = publicUrlFor(config.publicBaseUrl, key)
+    const title = titleFor(raw.title, downloadName)
+    const publicUrl = publicUrlFor(publicBaseUrl, key)
     const issued = await storage.issueUpload({
       key,
       contentType,
@@ -260,7 +355,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       downloadName,
     })
     const receipt: Receipt = {
-      v: 1,
+      v: scope ? 2 : 1,
       key,
       mediaKind,
       contentType,
@@ -271,6 +366,15 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       // validly finish after that URL's short lifetime. Completion gets its
       // own longer window instead of falsely rejecting that successful PUT.
       expiresAt: Date.now() + config.receiptTtlSeconds * 1000,
+      ...(scope
+        ? {
+            destinationId: scope.destinationId,
+            grantId: scope.grantId,
+            grantVersion: scope.grantVersion,
+            section: scope.section,
+            title,
+          }
+        : {}),
     }
 
     return {
@@ -288,8 +392,29 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
   },
 
   async complete(authorization: string | undefined, uploadReceipt: unknown) {
-    requireAuthorization(authorization, config)
     const receipt = decodeReceipt(uploadReceipt, config.receiptSecret)
+    let scope: ResolvedGrant | null = null
+    if (config.resolveGrant) {
+      // A version-1 receipt has no destination. Completing it here would file
+      // it under whichever grant the token holds now.
+      if (receipt.v !== 2 || !receipt.destinationId) {
+        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
+      }
+      scope = await config.resolveGrant(authorization, receipt.destinationId)
+      if (
+        scope.grantId !== receipt.grantId ||
+        scope.grantVersion !== receipt.grantVersion ||
+        scope.section !== receipt.section ||
+        !receipt.key.startsWith(`${scope.keyPrefix}/`)
+      ) {
+        throw new SiteManagerError(401, "unauthorized", "This publishing grant is no longer valid for that upload.")
+      }
+    } else {
+      requireAuthorization(authorization, config)
+      if (receipt.v !== 1) {
+        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
+      }
+    }
     const stored = await storage.inspectUpload(receipt.key)
     if (!stored) {
       throw new SiteManagerError(409, "upload_missing", "The upload is not present in the site's storage.")
@@ -302,11 +427,29 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       throw new SiteManagerError(409, "upload_mismatch", "The stored file does not match the upload request.")
     }
 
+    let pageUrl: string | undefined
+    if (scope && config.onPublished) {
+      const published = await config.onPublished({
+        key: receipt.key,
+        publicUrl: receipt.publicUrl,
+        mediaKind: receipt.mediaKind,
+        contentType: receipt.contentType,
+        contentLength: receipt.contentLength,
+        checksumSha256: receipt.checksumSha256,
+        downloadName: downloadNameFor(receipt.title, receipt.key.split(".").pop() || "bin"),
+        title: receipt.title || "Untitled",
+        destinationId: scope.destinationId,
+        section: scope.section,
+      })
+      pageUrl = published.pageUrl
+    }
+
     return {
       protocol: SITE_MANAGER_PROTOCOL,
       version: SITE_MANAGER_VERSION,
       status: "published" as const,
       publicUrl: receipt.publicUrl,
+      pageUrl,
       // Version 1's smallest useful audio case has no generated landing page.
       // A richer adapter may later make this a site page instead of the object.
       downloadUrl: receipt.mediaKind === "audio" || receipt.mediaKind === "bundle"

@@ -66,6 +66,15 @@ export type SiteManagerManifestRelease = {
   publishedAt: string
 }
 
+export type SiteManagerMovie = {
+  id: string
+  title: string
+  url: string
+  poster: string
+  bytes: number
+  publishedAt: string
+}
+
 export type SiteManagerManifest = {
   protocol: typeof PROTOCOL
   version: typeof VERSION
@@ -77,6 +86,12 @@ export type SiteManagerManifest = {
    * leftover files.
    */
   releases?: SiteManagerManifestRelease[]
+  /**
+   * Films published to the Movies destination. Absent means there are none
+   * from this manifest; the static films in artists.ts are a different list
+   * and are not deleted when this is missing or the fetch fails.
+   */
+  movies?: SiteManagerMovie[]
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -303,35 +318,101 @@ export const parseSiteManagerManifest = (
     items,
   }
 
-  if (!("releases" in source)) return parsed
-  if (!Array.isArray(source.releases) || source.releases.length > MAX_RELEASES) {
-    return null
-  }
-
-  const itemsById = new Map(items.map((item) => [item.id, item]))
-  const releases: SiteManagerManifestRelease[] = []
-  const releaseIds = new Set<string>()
-  const referenced = new Set<string>()
-  for (const raw of source.releases) {
-    const release = parseRelease(raw, itemsById)
-    if (
-      !release ||
-      releaseIds.has(release.id) ||
-      itemIds.has(release.id)
-    ) {
+  if ("releases" in source) {
+    if (!Array.isArray(source.releases) || source.releases.length > MAX_RELEASES) {
       return null
     }
-    for (const id of [release.audio, release.reel, release.artwork, release.bundle]) {
-      if (!id) continue
-      if (referenced.has(id)) return null
-      referenced.add(id)
+    const itemsById = new Map(items.map((item) => [item.id, item]))
+    const releases: SiteManagerManifestRelease[] = []
+    const releaseIds = new Set<string>()
+    const referenced = new Set<string>()
+    for (const raw of source.releases) {
+      const release = parseRelease(raw, itemsById)
+      if (
+        !release ||
+        releaseIds.has(release.id) ||
+        itemIds.has(release.id)
+      ) {
+        return null
+      }
+      for (const id of [release.audio, release.reel, release.artwork, release.bundle]) {
+        if (!id) continue
+        if (referenced.has(id)) return null
+        referenced.add(id)
+      }
+      releaseIds.add(release.id)
+      releases.push(release)
     }
-    releaseIds.add(release.id)
-    releases.push(release)
+    parsed.releases = releases
   }
 
-  parsed.releases = releases
+  if ("movies" in source) {
+    if (!Array.isArray(source.movies) || source.movies.length > MAX_ITEMS) return null
+    const movies: SiteManagerMovie[] = []
+    const movieIds = new Set<string>()
+    for (const raw of source.movies) {
+      const movie = parseMovie(raw, expected.origin)
+      if (!movie || movieIds.has(movie.id) || itemIds.has(movie.id)) return null
+      movieIds.add(movie.id)
+      movies.push(movie)
+    }
+    parsed.movies = movies
+  }
+
   return parsed
+}
+
+/**
+ * A film entry. The poster may be empty: the shelf already draws a plain
+ * frame when there is no image, and requiring one would refuse a film whose
+ * file had already been stored.
+ */
+const parseMovie = (value: unknown, manifestOrigin: string): SiteManagerMovie | null => {
+  if (!isRecord(value) || !isUUID(value.id)) return null
+  const title = typeof value.title === "string" ? value.title.trim() : ""
+  if (!title || title.length > 160 || !isISOInstant(value.publishedAt)) return null
+  if (
+    typeof value.bytes !== "number" ||
+    !Number.isSafeInteger(value.bytes) ||
+    value.bytes < 1 ||
+    value.bytes > MAX_MEDIA_BYTES
+  ) {
+    return null
+  }
+  const url = sameOriginMedia(value.url, manifestOrigin, [".mp4", ".mov", ".webm"])
+  if (!url) return null
+  const poster = value.poster === ""
+    ? ""
+    : sameOriginMedia(value.poster, manifestOrigin, [".jpg", ".jpeg", ".png", ".webp"])
+  if (poster === null) return null
+  return {
+    id: value.id.toLowerCase(),
+    title,
+    url,
+    poster,
+    bytes: value.bytes,
+    publishedAt: value.publishedAt,
+  }
+}
+
+const sameOriginMedia = (value: unknown, manifestOrigin: string, extensions: string[]) => {
+  if (typeof value !== "string" || value.length > 1_000) return null
+  let mediaUrl: URL
+  try {
+    mediaUrl = new URL(value)
+  } catch {
+    return null
+  }
+  if (
+    mediaUrl.protocol !== "https:" ||
+    mediaUrl.username ||
+    mediaUrl.password ||
+    mediaUrl.origin !== manifestOrigin ||
+    !extensions.some((extension) => mediaUrl.pathname.toLowerCase().endsWith(extension))
+  ) {
+    return null
+  }
+  return mediaUrl.toString()
 }
 
 const readManifest = async (
@@ -352,6 +433,9 @@ const readManifest = async (
       headers: { accept: "application/json" },
       redirect: "error" as const,
       signal: AbortSignal.timeout(5_000),
+      // A new film or sound can take this long to show. The manifest itself
+      // is also sent with max-age=60. A failed fetch returns null, and the
+      // caller must keep the static films rather than replace them with nothing.
       next: { revalidate: 60 },
     }
     const response = await fetch(url, options)
@@ -399,6 +483,12 @@ export const shelfEntriesFrom = (
  * publisher has stated the catalogue, so leftover files are inventory and
  * hidden releases stay hidden. The website does not wrap one into the other.
  */
+export const getSiteManagerMovies = async (
+  manifestUrl?: string
+): Promise<SiteManagerMovie[]> => {
+  return (await readManifest(manifestUrl))?.movies ?? []
+}
+
 export const getSiteManagerShelf = async (
   manifestUrl?: string
 ): Promise<SiteManagerShelfEntry[]> => {
