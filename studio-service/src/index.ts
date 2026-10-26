@@ -1,4 +1,5 @@
 import { createPublicKey, type KeyObject } from "node:crypto"
+import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager"
 import { S3PublishStorage } from "../../backend/src/site-manager/s3-adapter.ts"
 import { DESTINATIONS } from "./destinations.ts"
 import { handle, type HandlerDeps } from "./handler.ts"
@@ -10,13 +11,10 @@ import { sendStudioInvite } from "./mail.ts"
 /**
  * The studio publishing service. Render does not run this file.
  *
- * The receipt secret is injected by CloudFormation from Secrets Manager at
- * deploy time. This process reads the environment. It does not fetch or log
- * the value. A missing value refuses every request rather than publishing
- * with an empty secret.
+ * The environment holds the secret's name, not its value. The value is read
+ * once per warm process and kept in memory. It is never logged and never
+ * put on a response. A missing or short value refuses every request.
  */
-const receiptSecret = process.env.STUDIO_RECEIPT_SECRET?.trim() ?? ""
-const configured = receiptSecret.length >= 32 && receiptSecret !== "PLACEHOLDER"
 const tableName = process.env.STUDIO_GRANTS_TABLE?.trim() ?? ""
 const issuer = process.env.STUDIO_COGNITO_ISSUER?.trim() ?? ""
 const audience = process.env.STUDIO_COGNITO_CLIENT_ID?.trim() ?? ""
@@ -24,31 +22,41 @@ const admins = new Set(
   (process.env.STUDIO_ADMIN_SUBS ?? "").split(",").map((item) => item.trim()).filter(Boolean),
 )
 
-const deps: HandlerDeps | null = configured
-  ? {
-      service: createStudioService({
-        store: tableName ? dynamoGrantStore(tableName) : memoryGrantStore(),
-        manifests: s3ManifestStore(DESTINATIONS[0].bucket, DESTINATIONS[0].region),
-        storage: new S3PublishStorage({
-          bucket: DESTINATIONS[0].bucket,
-          region: DESTINATIONS[0].region,
-        }),
-        receiptSecret,
-        admins,
-        sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
-      }),
-      allowedOrigins: ["https://777records777.studio"],
-      verifyIdentity: (authorization) => {
-        const match = authorization?.match(/^Bearer ([^\s]+)$/i)
-        if (!match) throw new IdentityError("The sign-in token is not valid.")
-        return verifyIdToken(match[1], {
-          issuer,
-          audience,
-          getKey: (kid) => jwks(kid),
-        })
-      },
-    }
-  : null
+/** Rejects a value that must not be used to sign receipts. The message names no value. */
+export const acceptReceiptSecret = (value: string | undefined) => {
+  const trimmed = value?.trim() ?? ""
+  if (trimmed.length < 32 || trimmed === "PLACEHOLDER") {
+    throw new Error("The publishing service is not configured.")
+  }
+  return trimmed
+}
+
+const secrets = new SecretsManagerClient({})
+let warm: { id: string; deps: HandlerDeps } | null = null
+
+const depsFor = (receiptSecret: string): HandlerDeps => ({
+  service: createStudioService({
+    store: tableName ? dynamoGrantStore(tableName) : memoryGrantStore(),
+    manifests: s3ManifestStore(DESTINATIONS[0].bucket, DESTINATIONS[0].region),
+    storage: new S3PublishStorage({
+      bucket: DESTINATIONS[0].bucket,
+      region: DESTINATIONS[0].region,
+    }),
+    receiptSecret,
+    admins,
+    sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
+  }),
+  allowedOrigins: ["https://777records777.studio"],
+  verifyIdentity: (authorization) => {
+    const match = authorization?.match(/^Bearer ([^\s]+)$/i)
+    if (!match) throw new IdentityError("The sign-in token is not valid.")
+    return verifyIdToken(match[1], {
+      issuer,
+      audience,
+      getKey: (kid) => jwks(kid),
+    })
+  },
+})
 
 const keys = new Map<string, KeyObject>()
 
@@ -137,5 +145,21 @@ export const serve = async (
   }
 }
 
-export const handler = async (event: LambdaEvent) =>
-  serve(event, deps, { publicOrigin: process.env.STUDIO_PUBLIC_ORIGIN })
+const receiptFor = async (id: string) => {
+  const found = await secrets.send(new GetSecretValueCommand({ SecretId: id }))
+  return acceptReceiptSecret(found.SecretString)
+}
+
+export const handler = async (event: LambdaEvent) => {
+  const id = process.env.STUDIO_RECEIPT_SECRET_ID?.trim() ?? ""
+  if (!id) return notConfigured()
+  try {
+    if (!warm || warm.id !== id) {
+      warm = { id, deps: depsFor(await receiptFor(id)) }
+    }
+    return serve(event, warm.deps, { publicOrigin: process.env.STUDIO_PUBLIC_ORIGIN })
+  } catch {
+    warm = null
+    return notConfigured()
+  }
+}

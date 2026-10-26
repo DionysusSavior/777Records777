@@ -5,7 +5,7 @@ import type { PublishStorage } from "../../backend/src/site-manager/core.ts"
 import type { ManifestStore } from "../src/catalogue.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle, type HandlerDeps } from "../src/handler.ts"
-import { serve, type LambdaEvent } from "../src/index.ts"
+import { acceptReceiptSecret, handler, serve, type LambdaEvent } from "../src/index.ts"
 
 const ADMIN = "admin-sub-1"
 const VIZ = "viz-sub-1111"
@@ -256,6 +256,22 @@ test("a configured public origin wins over the event's own domain", async () => 
   assert.equal(response.statusCode, 201)
   const { endpoint } = decode((JSON.parse(response.body) as { connection: string }).connection)
   assert.equal(endpoint, "https://publish.777records777.studio/")
+})
+
+test("a short receipt secret is refused without the value being named", () => {
+  assert.throws(() => acceptReceiptSecret("too-short"), /not configured/)
+  assert.throws(() => acceptReceiptSecret("PLACEHOLDER"), /not configured/)
+  assert.equal(acceptReceiptSecret("x".repeat(32)).length, 32)
+})
+
+test("the service refuses to run until it is told which secret to read", async () => {
+  const previous = process.env.STUDIO_RECEIPT_SECRET_ID
+  delete process.env.STUDIO_RECEIPT_SECRET_ID
+  const response = await handler({ rawPath: "/discovery", requestContext: { http: { method: "GET" } } })
+  if (previous === undefined) delete process.env.STUDIO_RECEIPT_SECRET_ID
+  else process.env.STUDIO_RECEIPT_SECRET_ID = previous
+  assert.equal(response.statusCode, 503)
+  assert.equal(response.body.includes("studio/publishing-receipt"), false)
 })
 
 test("an unusable configured origin refuses to serve", async () => {
