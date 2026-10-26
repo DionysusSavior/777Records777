@@ -23,7 +23,7 @@ export const GRANT_FRESHNESS_MS = 30_000
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 export const BEGIN_LIMIT = 60
 export const BEGIN_WINDOW_MS = 60 * 60 * 1000
-const ADMIN_PAGE = "https://777records777.studio/studio-admin"
+const ADMIN_PAGE = "https://777records777.studio/admin"
 
 export type StudioGrant = {
   id: string
@@ -195,6 +195,7 @@ export const createStudioService = (options: {
   storage: PublishStorage
   receiptSecret: string
   admins: ReadonlySet<string>
+  authorizeAdmin?: (identity: StudioIdentity) => Promise<void>
   now?: () => number
   freshnessMs?: number
   mintToken?: () => string
@@ -205,7 +206,8 @@ export const createStudioService = (options: {
   const mintToken = options.mintToken ?? (() => randomBytes(32).toString("base64url"))
   const cache = new Map<string, { grant: StudioGrant; at: number }>()
 
-  const requireAdmin = (identity: StudioIdentity) => {
+  const requireAdmin = async (identity: StudioIdentity) => {
+    if (options.authorizeAdmin) return options.authorizeAdmin(identity)
     if (!options.admins.has(identity.sub)) {
       throw new SiteManagerError(403, "forbidden", "This account is not a studio administrator.")
     }
@@ -361,7 +363,7 @@ export const createStudioService = (options: {
     },
     complete: manager.complete,
     async createInvite(identity: StudioIdentity, body: { destinationId?: unknown; recipientEmail?: unknown }) {
-      requireAdmin(identity)
+      await requireAdmin(identity)
       const destination = destinationById(body.destinationId)
       if (!destination) {
         throw new SiteManagerError(400, "invalid_request", "Choose one artist and one section.")
@@ -472,7 +474,7 @@ export const createStudioService = (options: {
       return issued(next, token, destination)
     },
     async revoke(identity: StudioIdentity, grantId: unknown) {
-      requireAdmin(identity)
+      await requireAdmin(identity)
       const id = requireId(grantId, "Name the grant to revoke.")
       const revoked = await options.store.revokeGrant(id, now())
       if (!revoked) throw grantNotFound()
@@ -481,7 +483,7 @@ export const createStudioService = (options: {
     },
     /** The administrator never sees the artist's token. The holder fetches a new one with rotateOwn. */
     async forceReconnect(identity: StudioIdentity, grantId: unknown) {
-      requireAdmin(identity)
+      await requireAdmin(identity)
       const id = requireId(grantId, "Name the grant to rotate.")
       const grant = await options.store.getGrant(id)
       if (!grant || grant.revokedAt !== null) throw grantNotFound()
@@ -490,7 +492,7 @@ export const createStudioService = (options: {
       return { grantId: next.id, version: next.version, reconnectRequired: true }
     },
     async list(identity: StudioIdentity) {
-      requireAdmin(identity)
+      await requireAdmin(identity)
       const grants = await options.store.listGrants()
       return grants.map((grant) => ({
         id: grant.id,

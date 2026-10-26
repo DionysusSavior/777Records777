@@ -1,3 +1,4 @@
+import type { createAdminService } from "./admins.ts"
 import { SiteManagerError } from "../../backend/src/site-manager/core.ts"
 import { CatalogueError } from "./catalogue.ts"
 import { IdentityError, type VerifiedIdentity } from "./identity.ts"
@@ -6,6 +7,7 @@ import type { StudioService } from "./grants.ts"
 const MAX_BODY = 8_192
 
 export type HandlerDeps = {
+  people?: ReturnType<typeof createAdminService>
   service: StudioService
   allowedOrigins: readonly string[]
   verifyIdentity: (authorization: string | undefined) => Promise<VerifiedIdentity>
@@ -106,6 +108,18 @@ export const handle = async (
     }
 
     const identity = await deps.verifyIdentity(request.headers.get("authorization") ?? undefined)
+    if (deps.people && path.startsWith("/people/")) {
+      const people = deps.people
+      if (request.method === "GET" && path === "/people/status") return json(200, await people.status(identity), cors)
+      if (request.method === "POST") {
+        const body = await readJson(request)
+        if (path === "/people/setup") return json(200, await people.setup(identity), cors)
+        if (path === "/people/invite") return json(201, await people.invite(identity, body.email), cors)
+        if (path === "/people/accept") return json(200, await people.accept(identity, body.inviteId), cors)
+        if (path === "/people/remove") return json(200, await people.remove(identity, body.sub), cors)
+        if (path === "/people/cancel") return json(200, await people.cancel(identity, body.inviteId), cors)
+      }
+    }
     if (request.method === "POST" && path === "/admin/invites") {
       const body = await readJson(request)
       return json(201, await deps.service.createInvite(identity, body), cors)

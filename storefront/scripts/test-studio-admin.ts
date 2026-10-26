@@ -67,7 +67,7 @@ const fetchImpl: typeof fetch = async (input, init) => {
       inviteId: id,
       expiresAt: "2026-11-01T00:00:00.000Z",
       destination: { label: "Viz → 777records777.studio → Sounds" },
-      acceptUrl: `https://777records777.studio/studio-admin?invite=${id}`,
+      acceptUrl: `https://777records777.studio/admin?invite=${id}`,
       mailed: true,
     })
   }
@@ -120,7 +120,7 @@ const created = await run("dion-token", adminStore, async (deps) => {
   await createInvitation(deps, "viz-sounds", "Viz@Example.test")
 })
 check("the email is sent", created.created?.mailed === true)
-check("the link is for the studio page", created.created?.acceptUrl === "https://777records777.studio/studio-admin?invite=invite-12345678")
+check("the link is for the studio page", created.created?.acceptUrl === "https://777records777.studio/admin?invite=invite-12345678")
 
 const strangerStore = memory()
 strangerStore.setItem(KEYS.invite, "invite-12345678")

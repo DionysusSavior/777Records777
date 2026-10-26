@@ -1,3 +1,5 @@
+import { createAdminService } from "./admins.ts"
+import { dynamoAdminStore } from "./admin-store.ts"
 import { createPublicKey, type KeyObject } from "node:crypto"
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager"
 import { S3PublishStorage } from "../../backend/src/site-manager/s3-adapter.ts"
@@ -34,7 +36,11 @@ export const acceptReceiptSecret = (value: string | undefined) => {
 const secrets = new SecretsManagerClient({})
 let warm: { id: string; deps: HandlerDeps } | null = null
 
-const depsFor = (receiptSecret: string): HandlerDeps => ({
+const depsFor = (receiptSecret: string): HandlerDeps => {
+  if (!tableName) throw new Error("The studio membership store is not configured.")
+  const people = createAdminService(dynamoAdminStore(tableName), admins, process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined)
+  return ({
+  people,
   service: createStudioService({
     store: tableName ? dynamoGrantStore(tableName) : memoryGrantStore(),
     manifests: s3ManifestStore(DESTINATIONS[0].bucket, DESTINATIONS[0].region),
@@ -44,6 +50,7 @@ const depsFor = (receiptSecret: string): HandlerDeps => ({
     }),
     receiptSecret,
     admins,
+    authorizeAdmin: people.authorize,
     sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
   }),
   allowedOrigins: ["https://777records777.studio"],
@@ -57,6 +64,7 @@ const depsFor = (receiptSecret: string): HandlerDeps => ({
     })
   },
 })
+}
 
 const keys = new Map<string, KeyObject>()
 

@@ -89,7 +89,7 @@ export default function Om7CredentialPage() {
           publisher.
         </p>
         <a
-          href="/studio-admin"
+          href="/admin"
           className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/10"
         >
           Open studio admin

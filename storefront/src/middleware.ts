@@ -133,6 +133,7 @@ export async function middleware(request: NextRequest) {
    */
   if (
     request.nextUrl.pathname === "/om7-credential" ||
+    request.nextUrl.pathname === "/admin" ||
     request.nextUrl.pathname === "/studio-admin" ||
     request.nextUrl.pathname.startsWith("/.well-known/")
   ) {

@@ -16,12 +16,12 @@ export const sendStudioInvite = async (message: { to: string; acceptUrl: string;
     Destination: { ToAddresses: [message.to] },
     Content: {
       Simple: {
-        Subject: { Data: `Publish to ${message.label}`, Charset: "UTF-8" },
+        Subject: { Data: `Invitation: ${message.label}`, Charset: "UTF-8" },
         Body: {
           Text: {
             Charset: "UTF-8",
             Data: [
-              `You are invited to publish to ${message.label}.`,
+              `You are invited: ${message.label}.`,
               "",
               "Open this link and sign in with this same email address:",
               message.acceptUrl,

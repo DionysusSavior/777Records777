@@ -202,7 +202,7 @@ export function signOut(storage: SessionStore, config: StudioConfig, origin: str
   clearSession(storage)
   const url = new URL("/logout", config.cognitoDomain)
   url.searchParams.set("client_id", config.clientId)
-  url.searchParams.set("logout_uri", `${origin}/studio-admin`)
+  url.searchParams.set("logout_uri", `${origin}/admin`)
   return url.toString()
 }
 

@@ -103,7 +103,7 @@ test("two accounts: only the invited person accepts, and an admin never receives
   })
   assert.equal(created.status, 201)
   const inviteId = created.body.inviteId
-  assert.equal(created.body.acceptUrl, `https://777records777.studio/studio-admin?invite=${inviteId}`)
+  assert.equal(created.body.acceptUrl, `https://777records777.studio/admin?invite=${inviteId}`)
 
   const strangerView = await call(service, "POST", "/me/invites/view", admin, { inviteId })
   assert.equal(strangerView.status, 403)

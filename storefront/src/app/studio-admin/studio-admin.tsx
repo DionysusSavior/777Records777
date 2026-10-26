@@ -1,5 +1,6 @@
 "use client"
 
+import AdminPeople, { captureAdminInvite } from "./admin-people"
 import { useEffect, useReducer, useState } from "react"
 import {
   INVITE_LINK_BROKEN,
@@ -58,13 +59,14 @@ export default function StudioAdmin({
     if (!config) return
     const storage = window.sessionStorage
     const search = window.location.search
+    captureAdminInvite()
     const captured = captureInvite(storage, search)
     if (captured === "malformed") dispatch({ type: "invite-refused", message: INVITE_LINK_BROKEN })
     if (captured === "stored") dispatch({ type: "invite-waiting" })
-    const redirectUri = `${window.location.origin}/studio-admin`
+    const redirectUri = `${window.location.origin}/${new URLSearchParams(search).get("legacyCallback") === "1" ? "studio-admin" : "admin"}`
     void completeSignIn(storage, search, config, redirectUri, fetch).then(async (result) => {
       const stripped = new URL(window.location.href)
-      for (const name of ["code", "state", "error", "error_description", "invite"]) stripped.searchParams.delete(name)
+      for (const name of ["code", "state", "error", "error_description", "invite", "adminInvite", "legacyCallback"]) stripped.searchParams.delete(name)
       window.history.replaceState({}, "", `${stripped.pathname}${stripped.search}${stripped.hash}`)
       if (result.kind === "signed-in") {
         dispatch({ type: "signed-in", token: result.token })
@@ -114,7 +116,7 @@ export default function StudioAdmin({
           <button
             type="button"
             className={button}
-            onClick={() => void beginSignIn(window.sessionStorage, ready, `${window.location.origin}/studio-admin`).then((url) => {
+            onClick={() => void beginSignIn(window.sessionStorage, ready, `${window.location.origin}/admin`).then((url) => {
               window.location.assign(url)
             })}
           >
@@ -137,6 +139,8 @@ export default function StudioAdmin({
           </button>
         </p>
       )}
+
+      {state.token && <AdminPeople token={state.token} serviceUrl={ready.serviceUrl} refresh={() => loadAccount(depsFor(state.token!))} />}
 
       {state.invite.status === "ready" && (
         <section className="flex flex-col gap-3 rounded border border-white/15 p-4">
@@ -205,7 +209,7 @@ export default function StudioAdmin({
 
       {sections.admin && (
         <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-bold">Invite</h2>
+          <h2 className="text-lg font-bold">Publishing permissions</h2>
           <p className="text-sm text-white/70">
             Choose the page, then the person's email. The site sends them a link.
             It only works when they sign in with that same email.
@@ -249,7 +253,7 @@ export default function StudioAdmin({
           <ul className="flex flex-col gap-2 text-sm">
             {state.access.map((entry) => (
               <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-white/15 p-3">
-                <span>{entry.label}{entry.revoked ? " · removed" : ""}{entry.reconnectRequired && !entry.revoked ? " · needs a new connection" : ""}</span>
+                <span>{entry.accountId} · {entry.label}{entry.revoked ? " · removed" : ""}{entry.reconnectRequired && !entry.revoked ? " · needs a new connection" : ""}</span>
                 {!entry.revoked && state.token && (
                   <span className="flex gap-3">
                     <button type="button" className="text-xs uppercase tracking-[0.14em]" onClick={() => {

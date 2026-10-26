@@ -6,6 +6,7 @@
     "noEmit": true
   },
   "include": [
+    "src/app/admin/**/*.tsx",
     "src/app/studio-admin/**/*.ts",
     "src/app/studio-admin/**/*.tsx",
     "scripts/test-studio-admin.ts"
