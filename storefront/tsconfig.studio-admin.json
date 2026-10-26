@@ -7,7 +7,8 @@
   },
   "include": [
     "src/app/studio-admin/**/*.ts",
-    "src/app/studio-admin/**/*.tsx"
+    "src/app/studio-admin/**/*.tsx",
+    "scripts/test-studio-admin.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

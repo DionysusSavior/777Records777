@@ -19,7 +19,7 @@ import {
   type PageAction,
   type PageState,
   type SessionStore,
-} from "../src/app/studio-admin/studio-admin-logic.ts"
+} from "../src/app/studio-admin/studio-admin-logic"
 
 let failed = 0
 const check = (label: string, ok: boolean) => {
@@ -136,8 +136,9 @@ vizStore.setItem(KEYS.invite, "invite-12345678")
 vizStore.setItem(KEYS.verifier, "left-over")
 const viz = await run("viz-token", vizStore, async (deps) => {
   await loadInvite(deps)
-  if (deps.state().invite.status !== "ready") return
-  await acceptInvite(deps, deps.state().invite.invite.inviteId)
+  const ready = deps.state().invite
+  if (ready.status !== "ready") return
+  await acceptInvite(deps, ready.invite.inviteId)
 })
 check("Viz sees the page he was invited to", viz.invite.status === "accepted")
 check("the connection is shown from this result", viz.connection?.value === "om7-studio:abc")
