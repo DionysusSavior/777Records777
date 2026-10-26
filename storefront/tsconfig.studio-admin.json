@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "plugins": [],
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/app/studio-admin/**/*.ts",
+    "src/app/studio-admin/**/*.tsx"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

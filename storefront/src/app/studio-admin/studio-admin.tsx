@@ -1,45 +1,43 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useReducer, useState } from "react"
+import {
+  INVITE_LINK_BROKEN,
+  acceptInvite,
+  beginSignIn,
+  captureInvite,
+  completeSignIn,
+  createInvitation,
+  cutOffConnection,
+  formatExpiry,
+  loadAccount,
+  pageReducer,
+  recipientProblem,
+  removeAccess,
+  renewConnection,
+  sectionsFor,
+  signOut,
+  signedOutState,
+  studioClient,
+  studioConfig,
+  type PageDeps,
+} from "./studio-admin-logic"
 
-/**
- * Sign-in is Cognito's authorization-code flow with PKCE.
- *
- * The id token stays in memory. It is not written to localStorage and it is
- * not put in the address bar. Being able to sign in does not make someone an
- * administrator; the service refuses a grant from anyone who is not.
- */
-type Destination = {
-  id: string
-  label: string
-  artistName: string
-  section: string
-}
-
-const destinations: Destination[] = [
-  { id: "viz-sounds", label: "Viz → 777records777.studio → Sounds", artistName: "Viz", section: "sounds" },
-  { id: "viz-movies", label: "Viz → 777records777.studio → Movies", artistName: "Viz", section: "movies" },
-  { id: "dionysus-savior-sounds", label: "Dionysus Savior → 777records777.studio → Sounds", artistName: "Dionysus Savior", section: "sounds" },
-  { id: "dionysus-savior-movies", label: "Dionysus Savior → 777records777.studio → Movies", artistName: "Dionysus Savior", section: "movies" },
+const destinations = [
+  { id: "viz-sounds", label: "Viz → 777records777.studio → Sounds" },
+  { id: "viz-movies", label: "Viz → 777records777.studio → Movies" },
+  { id: "dionysus-savior-sounds", label: "Dionysus Savior → 777records777.studio → Sounds" },
+  { id: "dionysus-savior-movies", label: "Dionysus Savior → 777records777.studio → Movies" },
 ]
 
-const bytes = (size: number) => {
-  const values = new Uint8Array(size)
-  crypto.getRandomValues(values)
-  return values
-}
+const button = "w-fit rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-black"
+const quiet = "w-fit rounded-full border border-white/30 px-5 py-2 text-xs font-bold uppercase tracking-[0.14em]"
 
-const base64url = (value: Uint8Array) =>
-  btoa(String.fromCharCode(...value)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")
-
-async function challenge() {
-  const verifier = base64url(bytes(32))
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))
-  const method = base64url(new Uint8Array(digest))
-  sessionStorage.setItem("studio-admin.pkce", verifier)
-  return method
-}
-
+/**
+ * The administrator signs in here, names an email, and the site sends the
+ * invitation. The person who receives it signs in with that same email and
+ * gets a connection string, once, to paste into OM7 Player.
+ */
 export default function StudioAdmin({
   serviceUrl,
   cognitoDomain,
@@ -49,73 +47,45 @@ export default function StudioAdmin({
   cognitoDomain: string
   clientId: string
 }) {
-  const ready = serviceUrl.startsWith("https://") && cognitoDomain.startsWith("https://") && clientId.length > 0
-  const [token, setToken] = useState<string | null>(null)
+  const config = studioConfig(serviceUrl, cognitoDomain, clientId)
+  const [state, dispatch] = useReducer(pageReducer, null, signedOutState)
   const [destinationId, setDestinationId] = useState(destinations[0].id)
-  const [recipientSub, setRecipientSub] = useState("")
-  const [inviteId, setInviteId] = useState("")
-  const [notice, setNotice] = useState<string | null>(null)
-  const [secret, setSecret] = useState<string | null>(null)
-  const [grants, setGrants] = useState<Array<{ id: string; label: string; revoked: boolean; principalSub: string }>>([])
-
-  const redirectUri = useMemo(() => {
-    if (typeof window === "undefined") return ""
-    return `${window.location.origin}/studio-admin`
-  }, [])
+  const [email, setEmail] = useState("")
+  const [busy, setBusy] = useState(false)
+  const sections = sectionsFor(config, state)
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("code")
-    const verifier = sessionStorage.getItem("studio-admin.pkce")
-    if (!code || !verifier || !ready) return
-    const body = new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: clientId,
-      code,
-      redirect_uri: `${window.location.origin}/studio-admin`,
-      code_verifier: verifier,
+    if (!config) return
+    const storage = window.sessionStorage
+    const search = window.location.search
+    const captured = captureInvite(storage, search)
+    if (captured === "malformed") dispatch({ type: "invite-refused", message: INVITE_LINK_BROKEN })
+    if (captured === "stored") dispatch({ type: "invite-waiting" })
+    const redirectUri = `${window.location.origin}/studio-admin`
+    void completeSignIn(storage, search, config, redirectUri, fetch).then(async (result) => {
+      const stripped = new URL(window.location.href)
+      for (const name of ["code", "state", "error", "error_description", "invite"]) stripped.searchParams.delete(name)
+      window.history.replaceState({}, "", `${stripped.pathname}${stripped.search}${stripped.hash}`)
+      if (result.kind === "signed-in") {
+        dispatch({ type: "signed-in", token: result.token })
+        await loadAccount(depsFor(result.token))
+        return
+      }
+      if (result.kind === "failed") dispatch({ type: "sign-in-failed", message: result.message })
     })
-    void fetch(new URL("/oauth2/token", cognitoDomain), {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    }).then(async (response) => {
-      const payload = await response.json()
-      if (typeof payload.id_token === "string") setToken(payload.id_token)
-      else setNotice("Sign-in did not return a token.")
-      sessionStorage.removeItem("studio-admin.pkce")
-      window.history.replaceState({}, "", "/studio-admin")
-    }).catch(() => setNotice("Sign-in could not be completed."))
-  }, [ready, clientId, cognitoDomain])
+    // The config values are the only inputs, and they do not change after render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  async function signIn() {
-    const codeChallenge = await challenge()
-    const url = new URL("/oauth2/authorize", cognitoDomain)
-    url.searchParams.set("response_type", "code")
-    url.searchParams.set("client_id", clientId)
-    url.searchParams.set("redirect_uri", redirectUri)
-    url.searchParams.set("scope", "openid email")
-    url.searchParams.set("code_challenge_method", "S256")
-    url.searchParams.set("code_challenge", codeChallenge)
-    window.location.assign(url.toString())
-  }
+  const depsFor = (token: string): PageDeps => ({
+    client: studioClient(config!.serviceUrl, token, fetch),
+    storage: window.sessionStorage,
+    dispatch,
+  })
 
-  async function call(path: string, body?: unknown) {
-    const response = await fetch(new URL(path, serviceUrl), {
-      method: body ? "POST" : "GET",
-      headers: {
-        authorization: `Bearer ${token}`,
-        ...(body ? { "content-type": "application/json" } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    })
-    const payload = await response.json()
-    if (!response.ok) {
-      throw new Error(payload?.error?.message ?? "The studio service refused that.")
-    }
-    return payload
-  }
+  if (!sections.notConnected && !config) return null
 
-  if (!ready) {
+  if (sections.notConnected) {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-4 px-6 py-16 text-white">
         <h1 className="text-2xl font-bold">Studio admin</h1>
@@ -129,22 +99,119 @@ export default function StudioAdmin({
     )
   }
 
+  const ready = config!
+
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-16 text-white">
       <h1 className="text-2xl font-bold">Studio admin</h1>
-      <p className="text-sm leading-relaxed text-white/70">
-        Choose the artist and the section. A grant publishes to that one
-        place. It does not make the person an administrator, and it does not
-        show customers.
-      </p>
-      {!token ? (
-        <button type="button" onClick={() => void signIn()} className="w-fit rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-black">
-          Sign in
-        </button>
-      ) : (
+      {sections.signIn && (
         <>
+          <p className="text-sm leading-relaxed text-white/70">
+            {state.invite.status === "waiting" || state.invite.status === "loading"
+              ? "Sign in with the OM7 account for the email this invitation was sent to."
+              : "Sign in with your OM7 account. Being able to sign in does not by itself let you invite anyone."}
+          </p>
+          <button
+            type="button"
+            className={button}
+            onClick={() => void beginSignIn(window.sessionStorage, ready, `${window.location.origin}/studio-admin`).then((url) => {
+              window.location.assign(url)
+            })}
+          >
+            Sign in
+          </button>
+        </>
+      )}
+
+      {state.identity && (
+        <p className="text-sm text-white/70">
+          Signed in{state.identity.email ? ` as ${state.identity.email}` : ""}.
+          <button
+            type="button"
+            className="ml-3 text-xs uppercase tracking-[0.14em] text-white/70"
+            onClick={() => {
+              window.location.assign(signOut(window.sessionStorage, ready, window.location.origin))
+            }}
+          >
+            Sign out
+          </button>
+        </p>
+      )}
+
+      {state.invite.status === "ready" && (
+        <section className="flex flex-col gap-3 rounded border border-white/15 p-4">
+          <p className="text-sm">{state.invite.invite.label}</p>
+          <p className="text-sm text-white/70">Expires {formatExpiry(state.invite.invite.expiresAt)}.</p>
+          <button
+            type="button"
+            className={button}
+            disabled={busy}
+            onClick={() => {
+              if (!state.token) return
+              setBusy(true)
+              void acceptInvite(depsFor(state.token), state.invite.status === "ready" ? state.invite.invite.inviteId : "").finally(() => setBusy(false))
+            }}
+          >
+            Accept
+          </button>
+        </section>
+      )}
+      {state.invite.status === "accepting" && <p className="text-sm text-white/70">Accepting…</p>}
+      {(state.invite.status === "refused" || state.invite.status === "failed") && (
+        <p className="text-sm text-white/80">{state.invite.message}</p>
+      )}
+
+      {state.connection && (
+        <section className="flex flex-col gap-3 rounded border border-white/15 p-4">
+          <p className="text-sm">
+            {state.connection.replacesOld
+              ? `New connection for ${state.connection.label}. The old one stops working.`
+              : `Connection for ${state.connection.label}.`}
+            {" "}Paste this into OM7 Player, under Publish. It is shown once.
+          </p>
+          <textarea readOnly value={state.connection.value} className="h-32 rounded border border-white/20 bg-black p-3 text-xs" />
+          <button type="button" className={quiet} onClick={() => void navigator.clipboard.writeText(state.connection?.value ?? "")}>
+            Copy
+          </button>
+          <button type="button" className="w-fit text-xs uppercase tracking-[0.14em] text-white/70" onClick={() => dispatch({ type: "connection-dismissed" })}>
+            Dismiss
+          </button>
+        </section>
+      )}
+
+      {sections.myConnections && state.myConnections && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-bold">Your connections</h2>
+          {state.myConnections.length === 0 && <p className="text-sm text-white/70">None yet.</p>}
+          {state.myConnections.map((connection) => (
+            <div key={connection.id} className="flex flex-col gap-2 rounded border border-white/15 p-4 text-sm">
+              <p>{connection.label}{connection.revoked ? " · removed" : ""}</p>
+              {connection.reconnectRequired && !connection.revoked && (
+                <p className="text-white/70">This one needs a new connection. The old one no longer works.</p>
+              )}
+              {!connection.revoked && (
+                <button
+                  type="button"
+                  className={quiet}
+                  onClick={() => state.token && void renewConnection(depsFor(state.token), connection.id)}
+                >
+                  New connection
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {sections.admin && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold">Invite</h2>
+          <p className="text-sm text-white/70">
+            Choose the page, then the person's email. The site sends them a link.
+            It only works when they sign in with that same email.
+          </p>
           <label className="flex flex-col gap-2 text-sm">
-            Destination
+            Page
             <select value={destinationId} onChange={(event) => setDestinationId(event.target.value)} className="rounded border border-white/20 bg-black px-3 py-2">
               {destinations.map((destination) => (
                 <option key={destination.id} value={destination.id}>{destination.label}</option>
@@ -152,53 +219,62 @@ export default function StudioAdmin({
             </select>
           </label>
           <label className="flex flex-col gap-2 text-sm">
-            Recipient account id
-            <input value={recipientSub} onChange={(event) => setRecipientSub(event.target.value)} className="rounded border border-white/20 bg-black px-3 py-2" placeholder="Cognito sub, not an email" />
+            Email
+            <input value={email} onChange={(event) => setEmail(event.target.value)} className="rounded border border-white/20 bg-black px-3 py-2" placeholder="name@example.com" />
           </label>
+          {recipientProblem(email) && email.trim() !== "" && (
+            <p className="text-sm text-white/70">{recipientProblem(email)}</p>
+          )}
           <button
             type="button"
-            className="w-fit rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-black"
-            onClick={() => void call("/admin/invites", { destinationId, recipientSub }).then((payload) => {
-              setInviteId(payload.inviteId)
-              setNotice(`Invitation ${payload.inviteId} is for ${payload.destination.label}.`)
-            }).catch((error: Error) => setNotice(error.message))}
+            className={button}
+            onClick={() => state.token && void createInvitation(depsFor(state.token), destinationId, email)}
           >
-            Invite
+            Send invitation
           </button>
-          {inviteId && <p className="text-sm text-white/80">Invite id: {inviteId}</p>}
-          <button
-            type="button"
-            className="w-fit rounded-full border border-white/30 px-5 py-2 text-xs font-bold uppercase tracking-[0.14em]"
-            onClick={() => void call("/admin/invites/accept", { inviteId }).then((payload) => {
-              setSecret(payload.connection)
-              setNotice("The connection string is shown once. It publishes only to the invited page.")
-            }).catch((error: Error) => setNotice(error.message))}
-          >
-            Accept with this sign-in
-          </button>
-          {secret && <textarea readOnly value={secret} className="h-32 rounded border border-white/20 bg-black p-3 text-xs" />}
-          <button
-            type="button"
-            className="w-fit text-xs uppercase tracking-[0.14em] text-white/70"
-            onClick={() => void call("/admin/grants").then((payload) => setGrants(payload.grants)).catch((error: Error) => setNotice(error.message))}
-          >
-            Show grants
-          </button>
+          {state.created && (
+            <div className="flex flex-col gap-2 text-sm">
+              <p>
+                {state.created.mailed
+                  ? `An email is on its way for ${state.created.label}. It expires ${formatExpiry(state.created.expiresAt)}.`
+                  : `The invitation for ${state.created.label} exists, but the email could not be sent. Copy the link. It expires ${formatExpiry(state.created.expiresAt)}.`}
+              </p>
+              <textarea readOnly value={state.created.acceptUrl} className="h-20 rounded border border-white/20 bg-black p-3 text-xs" />
+              <button type="button" className={quiet} onClick={() => void navigator.clipboard.writeText(state.created?.acceptUrl ?? "")}>
+                Copy link
+              </button>
+            </div>
+          )}
+          <h2 className="text-lg font-bold">Access</h2>
           <ul className="flex flex-col gap-2 text-sm">
-            {grants.map((grant) => (
-              <li key={grant.id} className="flex items-center justify-between gap-3">
-                <span>{grant.label} · {grant.principalSub}{grant.revoked ? " · revoked" : ""}</span>
-                {!grant.revoked && (
-                  <button type="button" className="text-xs uppercase tracking-[0.14em]" onClick={() => void call("/admin/grants/revoke", { grantId: grant.id }).then(() => setNotice("Revoked. A new upload will not be added to the page.")).catch((error: Error) => setNotice(error.message))}>
-                    Revoke
-                  </button>
+            {state.access.map((entry) => (
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-white/15 p-3">
+                <span>{entry.label}{entry.revoked ? " · removed" : ""}{entry.reconnectRequired && !entry.revoked ? " · needs a new connection" : ""}</span>
+                {!entry.revoked && state.token && (
+                  <span className="flex gap-3">
+                    <button type="button" className="text-xs uppercase tracking-[0.14em]" onClick={() => {
+                      if (window.confirm("Cut off this connection? They will have to make a new one on this page.")) {
+                        void cutOffConnection(depsFor(state.token as string), entry.id)
+                      }
+                    }}>
+                      Cut off connection
+                    </button>
+                    <button type="button" className="text-xs uppercase tracking-[0.14em]" onClick={() => {
+                      if (window.confirm("Remove this access? New uploads to that page will be refused.")) {
+                        void removeAccess(depsFor(state.token as string), entry.id)
+                      }
+                    }}>
+                      Remove
+                    </button>
+                  </span>
                 )}
               </li>
             ))}
           </ul>
-        </>
+        </section>
       )}
-      {notice && <p className="text-sm text-white/80">{notice}</p>}
+
+      {state.notice && <p className="text-sm text-white/80">{state.notice}</p>}
     </main>
   )
 }

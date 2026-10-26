@@ -39,7 +39,8 @@ export type StudioGrant = {
 export type StudioInvite = {
   id: string
   destinationId: string
-  recipientSub: string
+  /** Lower case. The link is not enough: the signed-in account's verified email has to match. */
+  recipientEmail: string
   expiresAt: number
   consumedAt: number | null
 }
@@ -59,7 +60,7 @@ export interface GrantStore {
    */
   createGrantFromInvite(
     grant: StudioGrant,
-    consume: { inviteId: string; recipientSub: string; now: number },
+    consume: { inviteId: string; recipientEmail: string; now: number },
   ): Promise<StudioGrant | null>
   getGrant(id: string): Promise<StudioGrant | null>
   getGrantByHash(tokenSha256: string): Promise<StudioGrant | null>
@@ -117,7 +118,7 @@ export const memoryGrantStore = (): GrantStore => {
         invite.consumedAt !== null ||
         invite.expiresAt <= consume.now ||
         invite.destinationId !== grant.destinationId ||
-        !safeEqual(invite.recipientSub, consume.recipientSub)
+        !safeEqual(invite.recipientEmail, consume.recipientEmail)
       ) {
         return null
       }
@@ -176,7 +177,15 @@ const bearer = (authorization: string | undefined) => {
   return match?.[1] ?? null
 }
 
-export type StudioIdentity = { sub: string }
+export type StudioIdentity = { sub: string; email?: string | null; emailVerified?: boolean }
+
+const EMAIL = /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/
+
+export const normalizeEmail = (value: unknown) => {
+  if (typeof value !== "string") return null
+  const email = value.trim().toLowerCase()
+  return EMAIL.test(email) ? email : null
+}
 
 export type StudioService = ReturnType<typeof createStudioService>
 
@@ -189,6 +198,7 @@ export const createStudioService = (options: {
   now?: () => number
   freshnessMs?: number
   mintToken?: () => string
+  sendInvite?: (message: { to: string; acceptUrl: string; label: string }) => Promise<void>
 }) => {
   const now = options.now ?? Date.now
   const freshnessMs = options.freshnessMs ?? GRANT_FRESHNESS_MS
@@ -201,11 +211,25 @@ export const createStudioService = (options: {
     }
   }
 
-  const requireSub = (value: unknown) => {
-    if (typeof value !== "string" || !/^[A-Za-z0-9:_-]{8,128}$/.test(value)) {
-      throw new SiteManagerError(400, "invalid_request", "The recipient has to be their account id, not an email address.")
+  const requireEmail = (value: unknown) => {
+    const email = normalizeEmail(value)
+    if (!email) {
+      throw new SiteManagerError(400, "invalid_request", "Enter the person's email address.")
     }
-    return value
+    return email
+  }
+
+  const emailMatches = (identity: StudioIdentity, recipientEmail: string) => {
+    const email = normalizeEmail(identity.email)
+    return identity.emailVerified === true && email !== null && safeEqual(email, recipientEmail)
+  }
+
+  const requireEmailMatch = (identity: StudioIdentity, recipientEmail: string) => {
+    const email = normalizeEmail(identity.email)
+    if (email !== null && safeEqual(email, recipientEmail) && identity.emailVerified !== true) {
+      throw new SiteManagerError(403, "email_unverified", "That account's email is not confirmed yet.")
+    }
+    if (!emailMatches(identity, recipientEmail)) throw inviteDenied()
   }
 
   const requireId = (value: unknown, message: string) => {
@@ -336,33 +360,45 @@ export const createStudioService = (options: {
       return manager.begin(authorization, raw)
     },
     complete: manager.complete,
-    async createInvite(identity: StudioIdentity, body: { destinationId?: unknown; recipientSub?: unknown }) {
+    async createInvite(identity: StudioIdentity, body: { destinationId?: unknown; recipientEmail?: unknown }) {
       requireAdmin(identity)
       const destination = destinationById(body.destinationId)
       if (!destination) {
         throw new SiteManagerError(400, "invalid_request", "Choose one artist and one section.")
       }
-      const recipientSub = requireSub(body.recipientSub)
+      const recipientEmail = requireEmail(body.recipientEmail)
       const invite: StudioInvite = {
         id: randomUUID(),
         destinationId: destination.id,
-        recipientSub,
+        recipientEmail,
         expiresAt: now() + INVITE_TTL_MS,
         consumedAt: null,
       }
       await options.store.putInvite(invite)
+      const acceptUrl = `${ADMIN_PAGE}?invite=${encodeURIComponent(invite.id)}`
+      let mailed = false
+      if (options.sendInvite) {
+        try {
+          await options.sendInvite({ to: recipientEmail, acceptUrl, label: labelFor(destination) })
+          mailed = true
+        } catch {
+          mailed = false
+        }
+      }
       return {
         inviteId: invite.id,
         expiresAt: new Date(invite.expiresAt).toISOString(),
         destination: publicDestination(destination),
-        acceptUrl: `${ADMIN_PAGE}?invite=${encodeURIComponent(invite.id)}`,
+        acceptUrl,
+        mailed,
       }
     },
     /** A missing invite and somebody else's invite look the same, so an id proves nothing to a stranger. */
     async viewInvite(identity: StudioIdentity, inviteId: unknown) {
       const id = requireId(inviteId, "The invitation is missing.")
       const invite = await options.store.getInvite(id)
-      if (!invite || !safeEqual(invite.recipientSub, identity.sub)) throw inviteDenied()
+      if (!invite) throw inviteDenied()
+      requireEmailMatch(identity, invite.recipientEmail)
       if (invite.consumedAt !== null) {
         throw new SiteManagerError(410, "invite_used", "This invitation has already been accepted.")
       }
@@ -386,11 +422,11 @@ export const createStudioService = (options: {
       if (
         !invite ||
         invite.consumedAt !== null ||
-        invite.expiresAt <= at ||
-        !safeEqual(invite.recipientSub, identity.sub)
+        invite.expiresAt <= at
       ) {
         throw inviteDenied()
       }
+      requireEmailMatch(identity, invite.recipientEmail)
       const destination = destinationById(invite.destinationId)
       if (!destination) {
         throw new SiteManagerError(403, "destination_denied", "That destination no longer exists.")
@@ -404,7 +440,7 @@ export const createStudioService = (options: {
         version: 1,
         revokedAt: null,
         reconnectRequired: false,
-      }, { inviteId: id, recipientSub: identity.sub, now: at })
+      }, { inviteId: id, recipientEmail: invite.recipientEmail, now: at })
       if (!grant) throw inviteDenied()
       return issued(grant, token, destination)
     },

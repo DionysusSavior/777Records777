@@ -254,7 +254,9 @@ export class ServiceError extends Error {
 
 const MESSAGES: Record<string, string> = {
   invite_denied:
-    "This invitation is for a different OM7 account. Sign out, then open the invitation link again and sign in with the account it was sent to.",
+    "This invitation is for a different email. Sign out, then open the link again and sign in with the OM7 account for that email.",
+  email_unverified:
+    "That OM7 account's email is not confirmed yet, so this invitation cannot be accepted.",
   invite_used:
     "This invitation has already been used. If it was you, choose New connection under Your connections to get a fresh one.",
   invite_expired: "This invitation has expired. Ask the studio for a new one.",
@@ -293,7 +295,7 @@ export type InviteDetails = { inviteId: string; expiresAt: string; label: string
 export type IssuedConnection = { grantId: string; label: string; value: string }
 export type MyConnection = { id: string; label: string; revoked: boolean; reconnectRequired: boolean }
 export type AccessEntry = MyConnection & { accountId: string }
-export type CreatedInvite = { inviteId: string; expiresAt: string; label: string; acceptUrl: string }
+export type CreatedInvite = { inviteId: string; expiresAt: string; label: string; acceptUrl: string; mailed: boolean }
 
 const badResponse = () => new ServiceError(200, "bad_response", "")
 
@@ -380,14 +382,14 @@ export const studioClient = (serviceUrl: string, token: string, fetchImpl: Fetch
     async renewMine(grantId: string) {
       return issued(await call("/me/grants/rotate", { grantId }))
     },
-    async createInvite(destinationId: string, recipientSub: string): Promise<CreatedInvite> {
-      const payload = await call("/admin/invites", { destinationId, recipientSub })
+    async createInvite(destinationId: string, recipientEmail: string): Promise<CreatedInvite> {
+      const payload = await call("/admin/invites", { destinationId, recipientEmail })
       const inviteId = text(payload.inviteId)
       const expiresAt = text(payload.expiresAt)
       const label = destinationLabel(payload)
       const acceptUrl = text(payload.acceptUrl)
       if (!inviteId || !expiresAt || !label || !acceptUrl || !httpsOrigin(acceptUrl)) throw badResponse()
-      return { inviteId, expiresAt, label, acceptUrl }
+      return { inviteId, expiresAt, label, acceptUrl, mailed: payload.mailed === true }
     },
     async access(): Promise<AccessEntry[]> {
       return list(await call("/admin/grants")).map((raw) => {
@@ -628,15 +630,12 @@ export async function renewConnection(deps: PageDeps, grantId: string) {
   await loadMyConnections(deps)
 }
 
-const ACCOUNT_ID = /^[A-Za-z0-9:_-]{8,128}$/
+const EMAIL = /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/
 
 export const recipientProblem = (value: string) => {
   const trimmed = value.trim()
-  if (!trimmed) return "Enter the person's OM7 account id."
-  if (trimmed.indexOf("@") !== -1) return "That looks like an email address. Use the person's OM7 account id instead."
-  if (!ACCOUNT_ID.test(trimmed)) {
-    return "That does not look like an OM7 account id. Ask the person to copy theirs from this page after they sign in."
-  }
+  if (!trimmed) return "Enter the person's email address."
+  if (!EMAIL.test(trimmed)) return "That does not look like an email address."
   return null
 }
 

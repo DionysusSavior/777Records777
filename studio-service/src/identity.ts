@@ -1,6 +1,6 @@
 import { verify as verifySignature, type KeyObject } from "node:crypto"
 
-export type VerifiedIdentity = { sub: string }
+export type VerifiedIdentity = { sub: string; email: string | null; emailVerified: boolean }
 
 export class IdentityError extends Error {
   constructor(message: string) {
@@ -37,6 +37,8 @@ export const verifyIdToken = async (
     exp?: number
     token_use?: string
     sub?: string
+    email?: unknown
+    email_verified?: unknown
   }
   try {
     header = JSON.parse(decode(parts[0]))
@@ -68,5 +70,6 @@ export const verifyIdToken = async (
   ) {
     throw new IdentityError("The sign-in token is not valid.")
   }
-  return { sub: payload.sub }
+  const email = typeof payload.email === "string" ? payload.email : null
+  return { sub: payload.sub, email, emailVerified: payload.email_verified === true && email !== null }
 }

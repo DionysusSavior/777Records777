@@ -204,7 +204,7 @@ const sample = (version = 1, token = "token-a"): StudioGrant => ({
 const invite = {
   id: "invite-1",
   destinationId: "viz-sounds",
-  recipientSub: "viz-sub-1111",
+  recipientEmail: "viz@example.test",
   expiresAt: Date.parse("2026-11-01T00:00:00.000Z"),
   consumedAt: null,
 }
@@ -218,9 +218,9 @@ for (const [name, make] of stores()) {
   test(`${name}: a stale rotate cannot resurrect a revocation`, async () => {
     const store = make()
     const grant = sample()
-    assert.ok(await store.createGrantFromInvite(grant, { inviteId: invite.id, recipientSub: invite.recipientSub, now: 1 }) === null)
+    assert.ok(await store.createGrantFromInvite(grant, { inviteId: invite.id, recipientEmail: invite.recipientEmail, now: 1 }) === null)
     await store.putInvite(invite)
-    assert.ok(await store.createGrantFromInvite(grant, { inviteId: invite.id, recipientSub: invite.recipientSub, now: 1 }))
+    assert.ok(await store.createGrantFromInvite(grant, { inviteId: invite.id, recipientEmail: invite.recipientEmail, now: 1 }))
     const read = await store.getGrant(grant.id)
     assert.ok(read)
     const revoked = await store.revokeGrant(grant.id, 50)
@@ -239,7 +239,7 @@ for (const [name, make] of stores()) {
   test(`${name}: revoke after rotate stays revoked, and only one of two writers wins`, async () => {
     const store = make()
     await store.putInvite(invite)
-    await store.createGrantFromInvite(sample(), { inviteId: invite.id, recipientSub: invite.recipientSub, now: 1 })
+    await store.createGrantFromInvite(sample(), { inviteId: invite.id, recipientEmail: invite.recipientEmail, now: 1 })
     const read = await store.getGrant("grant-1")
     assert.ok(read)
     const rotated = await store.rotateGrant(read, hash("token-b"))
@@ -260,7 +260,7 @@ for (const [name, make] of stores()) {
   test(`${name}: one snapshot, two reconnects, exactly one lands`, async () => {
     const store = make()
     await store.putInvite(invite)
-    await store.createGrantFromInvite(sample(), { inviteId: invite.id, recipientSub: invite.recipientSub, now: 1 })
+    await store.createGrantFromInvite(sample(), { inviteId: invite.id, recipientEmail: invite.recipientEmail, now: 1 })
     const read = await store.getGrant("grant-1")
     assert.ok(read)
     const raced = await Promise.allSettled([
@@ -282,7 +282,7 @@ test("dynamo: a failed transaction consumes nothing", async () => {
   fake.failNext = true
   await assert.rejects(() => store.createGrantFromInvite(sample(), {
     inviteId: invite.id,
-    recipientSub: invite.recipientSub,
+    recipientEmail: invite.recipientEmail,
     now: 1,
   }))
   const saved = await store.getInvite(invite.id)
@@ -301,7 +301,7 @@ test("dynamo: listGrants follows LastEvaluatedKey", async () => {
     // two live grants must never answer to the same token.
     await store.createGrantFromInvite({ ...sample(1, `token-${id}`), id: `grant-${id}` }, {
       inviteId: `invite-${id}`,
-      recipientSub: invite.recipientSub,
+      recipientEmail: invite.recipientEmail,
       now: 1,
     })
   }
@@ -334,8 +334,8 @@ test("a begin limit lives in the store and survives a new process", async () => 
     mintToken: () => `token-${issued++}`,
   })
   const first = make()
-  const created = await first.createInvite({ sub: "admin-sub-1" }, { destinationId: "viz-sounds", recipientSub: "viz-sub-1111" })
-  const grant = await first.acceptInvite({ sub: "viz-sub-1111" }, created.inviteId)
+  const created = await first.createInvite({ sub: "admin-sub-1" }, { destinationId: "viz-sounds", recipientEmail: "viz@example.test" })
+  const grant = await first.acceptInvite({ sub: "viz-sub-1111", email: "viz@example.test", emailVerified: true }, created.inviteId)
   const body = {
     filename: "a.mp3",
     mediaKind: "audio",

@@ -11,7 +11,13 @@ import { IdentityError, verifyIdToken } from "../src/identity.ts"
 const checksum = createHash("sha256").update("audio bytes").digest("base64")
 const ADMIN = "admin-sub-1"
 const VIZ = "viz-sub-1111"
+const VIZ_EMAIL = "viz@example.test"
 const STRANGER = "stranger-sub"
+const person = (sub: string, email?: string) => ({
+  sub,
+  email: email ?? null,
+  emailVerified: email !== undefined,
+})
 
 const storage = () => {
   const objects = new Map<string, StoredUpload>()
@@ -89,7 +95,7 @@ const setup = (freshnessMs = 0) => {
     files,
     at: (iso: string) => { clock = Date.parse(iso) },
     advance: (ms: number) => { clock += ms },
-    identity: (sub: string) => ({ sub }),
+    identity: person,
   }
 }
 
@@ -106,7 +112,7 @@ const audio = (destinationId: string) => ({
 test("an ordinary account cannot mint a grant", async () => {
   const { service, identity } = setup()
   await assert.rejects(
-    () => service.createInvite(identity(STRANGER), { destinationId: "viz-sounds", recipientSub: VIZ }),
+    () => service.createInvite(identity(STRANGER), { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL }),
     (error: { status: number; code: string }) => error.status === 403 && error.code === "forbidden",
   )
   assert.deepEqual(await service.list(identity(ADMIN)), [])
@@ -116,36 +122,85 @@ test("the wrong person, an expired invite, and a replay are refused", async () =
   const rig = setup()
   const created = await rig.service.createInvite(rig.identity(ADMIN), {
     destinationId: "viz-movies",
-    recipientSub: VIZ,
+    recipientEmail: VIZ_EMAIL,
   })
   await assert.rejects(
     () => rig.service.acceptInvite(rig.identity(STRANGER), created.inviteId),
     (error: { code: string }) => error.code === "invite_denied",
   )
   await assert.rejects(
-    () => rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientSub: "viz@example.com" }),
+    () => rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientEmail: VIZ }),
     (error: { code: string }) => error.code === "invalid_request",
   )
   rig.advance(8 * 24 * 60 * 60 * 1000)
   await assert.rejects(
-    () => rig.service.acceptInvite(rig.identity(VIZ), created.inviteId),
+    () => rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), created.inviteId),
     (error: { code: string }) => error.code === "invite_denied",
   )
   rig.advance(-8 * 24 * 60 * 60 * 1000)
-  const accepted = await rig.service.acceptInvite(rig.identity(VIZ), created.inviteId)
+  const accepted = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), created.inviteId)
   assert.equal(accepted.destination.id, "viz-movies")
   await assert.rejects(
-    () => rig.service.acceptInvite(rig.identity(VIZ), created.inviteId),
+    () => rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), created.inviteId),
     (error: { code: string }) => error.code === "invite_denied",
   )
 })
 
+test("an invitation is emailed, and only that verified address can accept it", async () => {
+  const sent: string[] = []
+  const rig = setup()
+  const service = createStudioService({
+    store: memoryGrantStore(),
+    manifests: rig.catalogue,
+    storage: rig.files.fake,
+    receiptSecret: "test-only-receipt-secret-that-is-long-enough",
+    admins: new Set([ADMIN]),
+    now: () => Date.parse("2026-10-25T12:00:00.000Z"),
+    mintToken: () => "token-mail",
+    sendInvite: async (message) => {
+      sent.push(message.to)
+      if (message.to.endsWith("@fail.test")) throw new Error("ses down")
+    },
+  })
+  const created = await service.createInvite(person(ADMIN), {
+    destinationId: "viz-sounds",
+    recipientEmail: "Viz@Example.TEST",
+  })
+  assert.equal(created.mailed, true)
+  assert.deepEqual(sent, ["viz@example.test"])
+  assert.match(created.acceptUrl, /invite=/)
+  await assert.rejects(
+    () => service.acceptInvite({ sub: VIZ, email: "viz@example.test", emailVerified: false }, created.inviteId),
+    (error: { code: string }) => error.code === "email_unverified",
+  )
+  await assert.rejects(
+    () => service.viewInvite(person("other-sub", "someone@else.test"), created.inviteId),
+    (error: { code: string }) => error.code === "invite_denied",
+  )
+  const preview = await service.viewInvite(
+    { sub: VIZ, email: "Viz@Example.TEST", emailVerified: true },
+    created.inviteId,
+  )
+  assert.equal(preview.destination.id, "viz-sounds")
+  const accepted = await service.acceptInvite(
+    { sub: VIZ, email: "viz@example.test", emailVerified: true },
+    created.inviteId,
+  )
+  assert.equal(accepted.token, "token-mail")
+
+  const quiet = await service.createInvite(person(ADMIN), {
+    destinationId: "viz-movies",
+    recipientEmail: "viz@fail.test",
+  })
+  assert.equal(quiet.mailed, false)
+})
+
 test("Viz can publish Sounds and Movies, and cannot use Dion's destination or receipt", async () => {
   const rig = setup()
-  const sounds = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientSub: VIZ })
-  const movies = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientSub: VIZ })
-  const soundGrant = await rig.service.acceptInvite(rig.identity(VIZ), sounds.inviteId)
-  const movieGrant = await rig.service.acceptInvite(rig.identity(VIZ), movies.inviteId)
+  const sounds = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL })
+  const movies = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientEmail: VIZ_EMAIL })
+  const soundGrant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), sounds.inviteId)
+  const movieGrant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), movies.inviteId)
 
   const begun = await rig.service.begin(`Bearer ${soundGrant.token}`, audio("viz-sounds"))
   assert.match(rig.files.issued()?.key ?? "", /^site-manager\/viz\/[0-9a-f-]+\.mp3$/)
@@ -183,8 +238,8 @@ test("Viz can publish Sounds and Movies, and cannot use Dion's destination or re
 
 test("a second completion keeps the first release", async () => {
   const rig = setup()
-  const invite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientSub: VIZ })
-  const grant = await rig.service.acceptInvite(rig.identity(VIZ), invite.inviteId)
+  const invite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL })
+  const grant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), invite.inviteId)
   const existing = JSON.stringify({
     protocol: "om7.site-manager.manifest",
     version: 1,
@@ -229,8 +284,8 @@ test("a second completion keeps the first release", async () => {
 
 test("revocation and rotation are enforced without a deploy", async () => {
   const rig = setup(30_000)
-  const invite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientSub: VIZ })
-  const grant = await rig.service.acceptInvite(rig.identity(VIZ), invite.inviteId)
+  const invite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL })
+  const grant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), invite.inviteId)
   const listed = await rig.service.list(rig.identity(ADMIN))
   const begun = await rig.service.begin(`Bearer ${grant.token}`, audio("viz-sounds"))
   await rig.service.revoke(rig.identity(ADMIN), listed[0].id)
@@ -241,8 +296,8 @@ test("revocation and rotation are enforced without a deploy", async () => {
   assert.equal(rig.catalogue.snapshot("site-manager/viz/index.json"), null)
   assert.match(UPLOAD_TTL_NOTE, /15 minutes/)
 
-  const other = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientSub: VIZ })
-  const movie = await rig.service.acceptInvite(rig.identity(VIZ), other.inviteId)
+  const other = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "viz-movies", recipientEmail: VIZ_EMAIL })
+  const movie = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), other.inviteId)
   const film = await rig.service.begin(`Bearer ${movie.token}`, {
     ...audio("viz-movies"),
     mediaKind: "video",
@@ -250,8 +305,8 @@ test("revocation and rotation are enforced without a deploy", async () => {
   })
   await rig.service.complete(`Bearer ${movie.token}`, film.uploadReceipt)
 
-  const rotatedInvite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "dionysus-savior-sounds", recipientSub: VIZ })
-  const rotatable = await rig.service.acceptInvite(rig.identity(VIZ), rotatedInvite.inviteId)
+  const rotatedInvite = await rig.service.createInvite(rig.identity(ADMIN), { destinationId: "dionysus-savior-sounds", recipientEmail: VIZ_EMAIL })
+  const rotatable = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), rotatedInvite.inviteId)
   await rig.service.begin(`Bearer ${rotatable.token}`, audio("dionysus-savior-sounds"))
   const grants = await rig.service.list(rig.identity(ADMIN))
   const target = grants.find((item) => item.destinationId === "dionysus-savior-sounds")
@@ -285,8 +340,8 @@ test("a warm cache serves a revoked grant only inside the freshness bound", asyn
   }
   const phone = createStudioService(shared)
   const admin = createStudioService(shared)
-  const invite = await admin.createInvite({ sub: ADMIN }, { destinationId: "viz-sounds", recipientSub: VIZ })
-  const grant = await phone.acceptInvite({ sub: VIZ }, invite.inviteId)
+  const invite = await admin.createInvite({ sub: ADMIN }, { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL })
+  const grant = await phone.acceptInvite(person(VIZ, VIZ_EMAIL), invite.inviteId)
   await phone.begin(`Bearer ${grant.token}`, audio("viz-sounds"))
   const [row] = await admin.list({ sub: ADMIN })
   await admin.revoke({ sub: ADMIN }, row.id)
@@ -303,7 +358,7 @@ test("anonymous and cross-origin admin calls are denied", async () => {
   const denied = await handle(new Request("https://studio.example/admin/invites", {
     method: "POST",
     headers: { origin: "https://evil.example", "content-type": "application/json" },
-    body: JSON.stringify({ destinationId: "viz-sounds", recipientSub: VIZ }),
+    body: JSON.stringify({ destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL }),
   }), {
     service: rig.service,
     allowedOrigins: ["https://777records777.studio"],
@@ -334,7 +389,7 @@ test("an ID token is checked, and a pool member is not thereby an admin", async 
   assert.equal(identity.sub, STRANGER)
   const rig = setup()
   await assert.rejects(
-    () => rig.service.createInvite(identity, { destinationId: "viz-sounds", recipientSub: VIZ }),
+    () => rig.service.createInvite(identity, { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL }),
     (error: { status: number }) => error.status === 403,
   )
 })

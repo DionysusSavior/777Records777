@@ -37,7 +37,7 @@ export const dynamoGrantStore = (
     return {
       id: item.id,
       destinationId: String(item.destinationId),
-      recipientSub: String(item.recipientSub),
+      recipientEmail: String(item.recipientEmail),
       expiresAt: Number(item.expiresAt),
       consumedAt: typeof item.consumedAt === "number" ? item.consumedAt : null,
     }
@@ -101,10 +101,10 @@ export const dynamoGrantStore = (
             TableName: tableName,
             Key: inviteKey(consume.inviteId),
             ConditionExpression:
-              "recipientSub = :sub AND attribute_not_exists(consumedAt) AND expiresAt > :now AND destinationId = :dest",
+              "recipientEmail = :email AND attribute_not_exists(consumedAt) AND expiresAt > :now AND destinationId = :dest",
             UpdateExpression: "SET consumedAt = :now",
             ExpressionAttributeValues: {
-              ":sub": consume.recipientSub,
+              ":email": consume.recipientEmail,
               ":now": consume.now,
               ":dest": grant.destinationId,
             },

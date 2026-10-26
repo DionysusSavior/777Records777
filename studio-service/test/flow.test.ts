@@ -9,9 +9,10 @@ import { serve, type LambdaEvent } from "../src/index.ts"
 
 const ADMIN = "admin-sub-1"
 const VIZ = "viz-sub-1111"
+const VIZ_EMAIL = "viz@example.test"
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
 
-const tokenFor = (sub: string) => {
+const tokenFor = (sub: string, email?: string) => {
   const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "test" })).toString("base64url")
   const payload = Buffer.from(JSON.stringify({
     iss: "https://cognito-idp.us-east-2.amazonaws.com/pool",
@@ -19,6 +20,7 @@ const tokenFor = (sub: string) => {
     token_use: "id",
     exp: Math.floor(Date.now() / 1000) + 600,
     sub,
+    ...(email ? { email, email_verified: true } : {}),
   })).toString("base64url")
   const signature = sign("RSA-SHA256", Buffer.from(`${header}.${payload}`), privateKey).toString("base64url")
   return `${header}.${payload}.${signature}`
@@ -50,8 +52,16 @@ const deps = (): HandlerDeps => {
     verifyIdentity: async (authorization) => {
       const match = authorization?.match(/^Bearer ([^\s]+)$/i)
       if (!match) throw new Error("missing")
-      const payload = JSON.parse(Buffer.from(match[1].split(".")[1], "base64url").toString()) as { sub: string }
-      return { sub: payload.sub }
+      const payload = JSON.parse(Buffer.from(match[1].split(".")[1], "base64url").toString()) as {
+        sub: string
+        email?: string
+        email_verified?: boolean
+      }
+      return {
+        sub: payload.sub,
+        email: payload.email ?? null,
+        emailVerified: payload.email_verified === true,
+      }
     },
   }
 }
@@ -86,10 +96,10 @@ const decode = (connection: string) => {
 test("two accounts: only the invited person accepts, and an admin never receives the token", async () => {
   const service = deps()
   const admin = tokenFor(ADMIN)
-  const viz = tokenFor(VIZ)
+  const viz = tokenFor(VIZ, VIZ_EMAIL)
   const created = await call(service, "POST", "/admin/invites", admin, {
     destinationId: "viz-sounds",
-    recipientSub: VIZ,
+    recipientEmail: VIZ_EMAIL,
   })
   assert.equal(created.status, 201)
   const inviteId = created.body.inviteId
@@ -151,7 +161,7 @@ test("a spoofed Host header cannot choose the connection endpoint", async () => 
   const event: LambdaEvent = {
     rawPath: "/admin/invites",
     headers: { host: "evil.example", authorization: `Bearer ${tokenFor(ADMIN)}`, "content-type": "application/json" },
-    body: JSON.stringify({ destinationId: "viz-sounds", recipientSub: VIZ }),
+    body: JSON.stringify({ destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL }),
     requestContext: { http: { method: "POST" }, domainName: "abc123.lambda-url.us-east-2.on.aws" },
   }
   const created = await serve(event, service, {})
@@ -159,7 +169,7 @@ test("a spoofed Host header cannot choose the connection endpoint", async () => 
   const inviteId = (JSON.parse(created.body) as { inviteId: string }).inviteId
   const accept = await serve({
     rawPath: "/admin/invites/accept",
-    headers: { host: "evil.example", authorization: `Bearer ${tokenFor(VIZ)}`, "content-type": "application/json" },
+    headers: { host: "evil.example", authorization: `Bearer ${tokenFor(VIZ, VIZ_EMAIL)}`, "content-type": "application/json" },
     body: JSON.stringify({ inviteId }),
     requestContext: { http: { method: "POST" }, domainName: "abc123.lambda-url.us-east-2.on.aws" },
   }, service, {})
@@ -172,12 +182,12 @@ test("accept with no trustworthy origin does not consume the invite", async () =
   const service = deps()
   const created = await call(service, "POST", "/admin/invites", tokenFor(ADMIN), {
     destinationId: "viz-sounds",
-    recipientSub: VIZ,
+    recipientEmail: VIZ_EMAIL,
   }, null)
   const inviteId = created.body.inviteId
-  const accepted = await call(service, "POST", "/admin/invites/accept", tokenFor(VIZ), { inviteId }, null)
+  const accepted = await call(service, "POST", "/admin/invites/accept", tokenFor(VIZ, VIZ_EMAIL), { inviteId }, null)
   assert.equal(accepted.status, 503)
-  const still = await call(service, "POST", "/me/invites/view", tokenFor(VIZ), { inviteId }, null)
+  const still = await call(service, "POST", "/me/invites/view", tokenFor(VIZ, VIZ_EMAIL), { inviteId }, null)
   assert.equal(still.status, 200)
 })
 
@@ -199,7 +209,7 @@ const acceptThrough = async (
 ) => {
   const created = await call(service, "POST", "/admin/invites", tokenFor(ADMIN), {
     destinationId: "viz-sounds",
-    recipientSub: VIZ,
+    recipientEmail: VIZ_EMAIL,
   })
   assert.equal(created.status, 201)
   return serve(
@@ -210,7 +220,7 @@ const acceptThrough = async (
       // whole headers object and quietly drop the authorization, which fails
       // as a 401 that looks nothing like the thing under test.
       headers: {
-        authorization: `Bearer ${tokenFor(VIZ)}`,
+        authorization: `Bearer ${tokenFor(VIZ, VIZ_EMAIL)}`,
         "content-type": "application/json",
         origin: "https://777records777.studio",
         ...(event.headers ?? {}),

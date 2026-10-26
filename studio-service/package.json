@@ -6,9 +6,10 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.964.0",
     "@aws-sdk/client-s3": "^3.964.0",
+    "@aws-sdk/client-sesv2": "^3.964.0",
     "@aws-sdk/lib-dynamodb": "^3.964.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test"
+    "test": "node --experimental-strip-types --test test/*.test.ts test/grant-contract.ts"
   }
 }

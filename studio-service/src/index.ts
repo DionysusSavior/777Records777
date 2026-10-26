@@ -5,6 +5,7 @@ import { handle, type HandlerDeps } from "./handler.ts"
 import { IdentityError, verifyIdToken } from "./identity.ts"
 import { createStudioService, memoryGrantStore } from "./grants.ts"
 import { dynamoGrantStore, s3ManifestStore } from "./aws.ts"
+import { sendStudioInvite } from "./mail.ts"
 
 /**
  * The studio publishing service. Render does not run this file.
@@ -34,6 +35,7 @@ const deps: HandlerDeps | null = configured
         }),
         receiptSecret,
         admins,
+        sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
       }),
       allowedOrigins: ["https://777records777.studio"],
       verifyIdentity: (authorization) => {
