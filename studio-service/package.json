@@ -9,6 +9,6 @@
     "@aws-sdk/lib-dynamodb": "^3.964.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test test/studio.test.ts"
+    "test": "node --experimental-strip-types --test"
   }
 }

@@ -14,19 +14,26 @@ import {
   type StudioDestination,
 } from "./destinations.ts"
 
-/** A warm instance may serve a grant it loaded this recently. Revocation is not instant. */
+/**
+ * A warm instance may serve a grant it loaded this recently. Revocation is not
+ * instant. The bound only holds because every authority read is strongly
+ * consistent; an eventually consistent read could add its own staleness.
+ */
 export const GRANT_FRESHNESS_MS = 30_000
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
-const BEGIN_LIMIT = 60
-const BEGIN_WINDOW_MS = 60 * 60 * 1000
+export const BEGIN_LIMIT = 60
+export const BEGIN_WINDOW_MS = 60 * 60 * 1000
+const ADMIN_PAGE = "https://777records777.studio/studio-admin"
 
 export type StudioGrant = {
   id: string
   destinationId: string
   principalSub: string
-  tokenSha256: string
+  /** Null once an administrator forces a reconnect, and after revocation. */
+  tokenSha256: string | null
   version: number
   revokedAt: number | null
+  reconnectRequired: boolean
 }
 
 export type StudioInvite = {
@@ -37,52 +44,121 @@ export type StudioInvite = {
   consumedAt: number | null
 }
 
+/**
+ * Every grant change is conditional on the version the caller read, so two
+ * changes made from one snapshot cannot both land. A token and the pointer
+ * that finds it change together or not at all. Nothing un-revokes a grant.
+ */
 export interface GrantStore {
   putInvite(invite: StudioInvite): Promise<void>
   getInvite(id: string): Promise<StudioInvite | null>
   /**
-   * One successful consume. A second call, a different person, and an expired
-   * invite all return null and change nothing.
+   * Consumes the invite and creates the grant and its token pointer at once.
+   * Null, with nothing changed, when the invite is missing, used, expired, for
+   * somebody else or for another destination.
    */
-  consumeInvite(id: string, recipientSub: string, now: number): Promise<StudioInvite | null>
-  putGrant(grant: StudioGrant): Promise<void>
+  createGrantFromInvite(
+    grant: StudioGrant,
+    consume: { inviteId: string; recipientSub: string; now: number },
+  ): Promise<StudioGrant | null>
   getGrant(id: string): Promise<StudioGrant | null>
   getGrantByHash(tokenSha256: string): Promise<StudioGrant | null>
   listGrants(): Promise<StudioGrant[]>
+  /** New token, next version, reconnect cleared. Throws `conflict` unless `expected` is current and unrevoked. */
+  rotateGrant(expected: StudioGrant, tokenSha256: string): Promise<StudioGrant>
+  /** No token, next version, reconnect required. Throws `conflict` on the same terms as rotateGrant. */
+  forceReconnect(expected: StudioGrant): Promise<StudioGrant>
+  /** Final and idempotent. Retries past a concurrent change instead of losing to it. Null for an unknown grant. */
+  revokeGrant(grantId: string, now: number): Promise<StudioGrant | null>
+  /** Counts one begin in the window. False, without counting, once `limit` are counted. */
+  noteBegin(input: { grantId: string; windowStart: number; limit: number; expiresAt: number }): Promise<boolean>
 }
+
+export const grantConflict = () =>
+  new SiteManagerError(409, "conflict", "The grant changed. Reload and try again.")
 
 export const memoryGrantStore = (): GrantStore => {
   const invites = new Map<string, StudioInvite>()
   const grants = new Map<string, StudioGrant>()
+  const pointers = new Map<string, string>()
+  const begins = new Map<string, number>()
+
+  const current = (expected: StudioGrant) => {
+    const found = grants.get(expected.id)
+    if (!found || found.version !== expected.version || found.revokedAt !== null) throw grantConflict()
+    return found
+  }
+
+  const commit = (previous: StudioGrant, next: StudioGrant) => {
+    if (next.tokenSha256 !== null && pointers.has(next.tokenSha256)) throw grantConflict()
+    if (previous.tokenSha256 !== null) pointers.delete(previous.tokenSha256)
+    if (next.tokenSha256 !== null) pointers.set(next.tokenSha256, next.id)
+    grants.set(next.id, next)
+    return { ...next }
+  }
+
+  const getGrant = async (id: string) => {
+    const found = grants.get(id)
+    return found ? { ...found } : null
+  }
+
   return {
     async putInvite(invite) {
-      invites.set(invite.id, invite)
+      invites.set(invite.id, { ...invite })
     },
     async getInvite(id) {
-      return invites.get(id) ?? null
+      const found = invites.get(id)
+      return found ? { ...found } : null
     },
-    async consumeInvite(id, recipientSub, now) {
-      const invite = invites.get(id)
-      if (!invite || invite.consumedAt !== null || invite.expiresAt <= now) return null
-      if (!safeEqual(invite.recipientSub, recipientSub)) return null
-      const consumed = { ...invite, consumedAt: now }
-      invites.set(id, consumed)
-      return consumed
-    },
-    async putGrant(grant) {
-      grants.set(grant.id, grant)
-    },
-    async getGrant(id) {
-      return grants.get(id) ?? null
-    },
-    async getGrantByHash(tokenSha256) {
-      for (const grant of grants.values()) {
-        if (grant.revokedAt === null && safeEqual(grant.tokenSha256, tokenSha256)) return grant
+    async createGrantFromInvite(grant, consume) {
+      const invite = invites.get(consume.inviteId)
+      if (
+        !invite ||
+        invite.consumedAt !== null ||
+        invite.expiresAt <= consume.now ||
+        invite.destinationId !== grant.destinationId ||
+        !safeEqual(invite.recipientSub, consume.recipientSub)
+      ) {
+        return null
       }
-      return null
+      if (grant.tokenSha256 === null || grants.has(grant.id) || pointers.has(grant.tokenSha256)) {
+        throw grantConflict()
+      }
+      invites.set(invite.id, { ...invite, consumedAt: consume.now })
+      grants.set(grant.id, { ...grant })
+      pointers.set(grant.tokenSha256, grant.id)
+      return { ...grant }
+    },
+    getGrant,
+    async getGrantByHash(tokenSha256) {
+      const grantId = pointers.get(tokenSha256)
+      const grant = grantId === undefined ? null : await getGrant(grantId)
+      if (!grant || grant.revokedAt !== null || grant.tokenSha256 !== tokenSha256) return null
+      return grant
     },
     async listGrants() {
-      return [...grants.values()]
+      return [...grants.values()].map((grant) => ({ ...grant }))
+    },
+    async rotateGrant(expected, tokenSha256) {
+      const found = current(expected)
+      return commit(found, { ...found, tokenSha256, version: found.version + 1, reconnectRequired: false })
+    },
+    async forceReconnect(expected) {
+      const found = current(expected)
+      return commit(found, { ...found, tokenSha256: null, version: found.version + 1, reconnectRequired: true })
+    },
+    async revokeGrant(grantId, now) {
+      const found = grants.get(grantId)
+      if (!found) return null
+      if (found.revokedAt !== null) return { ...found }
+      return commit(found, { ...found, tokenSha256: null, version: found.version + 1, revokedAt: now })
+    },
+    async noteBegin({ grantId, windowStart, limit }) {
+      const key = `${grantId}#${windowStart}`
+      const count = begins.get(key) ?? 0
+      if (count >= limit) return false
+      begins.set(key, count + 1)
+      return true
     },
   }
 }
@@ -118,7 +194,6 @@ export const createStudioService = (options: {
   const freshnessMs = options.freshnessMs ?? GRANT_FRESHNESS_MS
   const mintToken = options.mintToken ?? (() => randomBytes(32).toString("base64url"))
   const cache = new Map<string, { grant: StudioGrant; at: number }>()
-  const begins = new Map<string, { window: number; count: number }>()
 
   const requireAdmin = (identity: StudioIdentity) => {
     if (!options.admins.has(identity.sub)) {
@@ -133,8 +208,22 @@ export const createStudioService = (options: {
     return value
   }
 
-  const forget = (tokenSha256: string) => {
-    cache.delete(tokenSha256)
+  const requireId = (value: unknown, message: string) => {
+    if (typeof value !== "string" || value.length === 0 || value.length > 128) {
+      throw new SiteManagerError(400, "invalid_request", message)
+    }
+    return value
+  }
+
+  const inviteDenied = () =>
+    new SiteManagerError(403, "invite_denied", "That invitation is not for this account, or it has already been used.")
+
+  const grantNotFound = () => new SiteManagerError(404, "not_found", "That grant does not exist.")
+
+  const forgetGrant = (grantId: string) => {
+    for (const [tokenSha256, entry] of cache) {
+      if (entry.grant.id === grantId) cache.delete(tokenSha256)
+    }
   }
 
   const resolveGrant = async (authorization: string | undefined, destinationId: unknown) => {
@@ -151,7 +240,12 @@ export const createStudioService = (options: {
     const fresh = hit !== undefined && now() - hit.at < freshnessMs
     const grant = fresh ? hit.grant : await options.store.getGrantByHash(tokenSha256)
     if (!fresh && grant) cache.set(tokenSha256, { grant, at: now() })
-    if (!grant || grant.revokedAt !== null || !safeEqual(grant.tokenSha256, tokenSha256)) {
+    if (
+      !grant ||
+      grant.revokedAt !== null ||
+      grant.tokenSha256 === null ||
+      !safeEqual(grant.tokenSha256, tokenSha256)
+    ) {
       cache.delete(tokenSha256)
       throw new SiteManagerError(401, "unauthorized", "The publishing credential is not valid.")
     }
@@ -168,17 +262,17 @@ export const createStudioService = (options: {
     }
   }
 
-  const noteBegin = (grantId: string) => {
-    const at = now()
-    const current = begins.get(grantId)
-    if (!current || at - current.window >= BEGIN_WINDOW_MS) {
-      begins.set(grantId, { window: at, count: 1 })
-      return
-    }
-    if (current.count >= BEGIN_LIMIT) {
+  const noteBegin = async (grantId: string) => {
+    const windowStart = Math.floor(now() / BEGIN_WINDOW_MS) * BEGIN_WINDOW_MS
+    const counted = await options.store.noteBegin({
+      grantId,
+      windowStart,
+      limit: BEGIN_LIMIT,
+      expiresAt: Math.ceil((windowStart + 2 * BEGIN_WINDOW_MS) / 1000),
+    })
+    if (!counted) {
       throw new SiteManagerError(429, "rate_limited", "Too many uploads were started for this destination. Wait and retry.")
     }
-    current.count += 1
   }
 
   const manager = createSiteManager({
@@ -214,17 +308,31 @@ export const createStudioService = (options: {
     label: labelFor(destination),
   })
 
+  const labelOf = (grant: StudioGrant) => {
+    const destination = destinationById(grant.destinationId)
+    return destination ? labelFor(destination) : grant.destinationId
+  }
+
+  const issued = (grant: StudioGrant, token: string, destination: StudioDestination) => ({
+    grantId: grant.id,
+    version: grant.version,
+    token,
+    destination: publicDestination(destination),
+    prefix: destination.prefix,
+    label: labelFor(destination),
+  })
+
   return {
     discovery: () => ({
       protocol: "om7.site-manager",
       version: 1,
       capabilities: ["destinations"],
-      credentialUrl: "https://777records777.studio/studio-admin",
+      credentialUrl: ADMIN_PAGE,
       destinations: DESTINATIONS.map(publicDestination),
     }),
     begin: async (authorization: string | undefined, raw: Parameters<typeof manager.begin>[1]) => {
       const scope = await resolveGrant(authorization, raw.destinationId)
-      noteBegin(scope.grantId)
+      await noteBegin(scope.grantId)
       return manager.begin(authorization, raw)
     },
     complete: manager.complete,
@@ -247,65 +355,103 @@ export const createStudioService = (options: {
         inviteId: invite.id,
         expiresAt: new Date(invite.expiresAt).toISOString(),
         destination: publicDestination(destination),
+        acceptUrl: `${ADMIN_PAGE}?invite=${encodeURIComponent(invite.id)}`,
+      }
+    },
+    /** A missing invite and somebody else's invite look the same, so an id proves nothing to a stranger. */
+    async viewInvite(identity: StudioIdentity, inviteId: unknown) {
+      const id = requireId(inviteId, "The invitation is missing.")
+      const invite = await options.store.getInvite(id)
+      if (!invite || !safeEqual(invite.recipientSub, identity.sub)) throw inviteDenied()
+      if (invite.consumedAt !== null) {
+        throw new SiteManagerError(410, "invite_used", "This invitation has already been accepted.")
+      }
+      if (invite.expiresAt <= now()) {
+        throw new SiteManagerError(410, "invite_expired", "This invitation has expired. Ask for a new one.")
+      }
+      const destination = destinationById(invite.destinationId)
+      if (!destination) {
+        throw new SiteManagerError(403, "destination_denied", "That destination no longer exists.")
+      }
+      return {
+        inviteId: invite.id,
+        expiresAt: new Date(invite.expiresAt).toISOString(),
+        destination: publicDestination(destination),
       }
     },
     async acceptInvite(identity: StudioIdentity, inviteId: unknown) {
-      if (typeof inviteId !== "string") {
-        throw new SiteManagerError(400, "invalid_request", "The invitation is missing.")
-      }
-      const invite = await options.store.consumeInvite(inviteId, identity.sub, now())
-      if (!invite) {
-        throw new SiteManagerError(403, "invite_denied", "That invitation is not for this account, or it has already been used.")
+      const id = requireId(inviteId, "The invitation is missing.")
+      const at = now()
+      const invite = await options.store.getInvite(id)
+      if (
+        !invite ||
+        invite.consumedAt !== null ||
+        invite.expiresAt <= at ||
+        !safeEqual(invite.recipientSub, identity.sub)
+      ) {
+        throw inviteDenied()
       }
       const destination = destinationById(invite.destinationId)
       if (!destination) {
         throw new SiteManagerError(403, "destination_denied", "That destination no longer exists.")
       }
       const token = mintToken()
-      const grant: StudioGrant = {
+      const grant = await options.store.createGrantFromInvite({
         id: randomUUID(),
         destinationId: destination.id,
         principalSub: identity.sub,
         tokenSha256: hashToken(token),
         version: 1,
         revokedAt: null,
+        reconnectRequired: false,
+      }, { inviteId: id, recipientSub: identity.sub, now: at })
+      if (!grant) throw inviteDenied()
+      return issued(grant, token, destination)
+    },
+    async listOwn(identity: StudioIdentity) {
+      const grants = await options.store.listGrants()
+      return grants
+        .filter((grant) => safeEqual(grant.principalSub, identity.sub))
+        .map((grant) => ({
+          id: grant.id,
+          destinationId: grant.destinationId,
+          label: labelOf(grant),
+          version: grant.version,
+          revoked: grant.revokedAt !== null,
+          reconnectRequired: grant.reconnectRequired,
+        }))
+    },
+    async rotateOwn(identity: StudioIdentity, grantId: unknown) {
+      const id = requireId(grantId, "Name the grant to rotate.")
+      const grant = await options.store.getGrant(id)
+      if (!grant) throw grantNotFound()
+      if (!safeEqual(grant.principalSub, identity.sub)) {
+        throw new SiteManagerError(403, "forbidden", "That grant belongs to another account.")
       }
-      await options.store.putGrant(grant)
-      return {
-        token,
-        destination: publicDestination(destination),
-        prefix: destination.prefix,
-        label: labelFor(destination),
-      }
+      const destination = destinationById(grant.destinationId)
+      if (grant.revokedAt !== null || !destination) throw grantNotFound()
+      const token = mintToken()
+      const next = await options.store.rotateGrant(grant, hashToken(token))
+      forgetGrant(grant.id)
+      return issued(next, token, destination)
     },
     async revoke(identity: StudioIdentity, grantId: unknown) {
       requireAdmin(identity)
-      if (typeof grantId !== "string") {
-        throw new SiteManagerError(400, "invalid_request", "Name the grant to revoke.")
-      }
-      const grant = await options.store.getGrant(grantId)
-      if (!grant) throw new SiteManagerError(404, "not_found", "That grant does not exist.")
-      const revoked = { ...grant, revokedAt: now() }
-      await options.store.putGrant(revoked)
-      forget(grant.tokenSha256)
-      return { grantId: grant.id, revoked: true }
+      const id = requireId(grantId, "Name the grant to revoke.")
+      const revoked = await options.store.revokeGrant(id, now())
+      if (!revoked) throw grantNotFound()
+      forgetGrant(id)
+      return { grantId: id, revoked: true }
     },
-    async rotate(identity: StudioIdentity, grantId: unknown) {
+    /** The administrator never sees the artist's token. The holder fetches a new one with rotateOwn. */
+    async forceReconnect(identity: StudioIdentity, grantId: unknown) {
       requireAdmin(identity)
-      if (typeof grantId !== "string") {
-        throw new SiteManagerError(400, "invalid_request", "Name the grant to rotate.")
-      }
-      const grant = await options.store.getGrant(grantId)
-      if (!grant || grant.revokedAt !== null) {
-        throw new SiteManagerError(404, "not_found", "That grant does not exist.")
-      }
-      const destination = destinationById(grant.destinationId)
-      if (!destination) throw new SiteManagerError(404, "not_found", "That destination does not exist.")
-      const token = mintToken()
-      const next = { ...grant, tokenSha256: hashToken(token), version: grant.version + 1 }
-      await options.store.putGrant(next)
-      forget(grant.tokenSha256)
-      return { token, version: next.version, label: labelFor(destination) }
+      const id = requireId(grantId, "Name the grant to rotate.")
+      const grant = await options.store.getGrant(id)
+      if (!grant || grant.revokedAt !== null) throw grantNotFound()
+      const next = await options.store.forceReconnect(grant)
+      forgetGrant(grant.id)
+      return { grantId: next.id, version: next.version, reconnectRequired: true }
     },
     async list(identity: StudioIdentity) {
       requireAdmin(identity)
@@ -314,11 +460,10 @@ export const createStudioService = (options: {
         id: grant.id,
         destinationId: grant.destinationId,
         principalSub: grant.principalSub,
+        label: labelOf(grant),
         version: grant.version,
         revoked: grant.revokedAt !== null,
-        label: destinationById(grant.destinationId)
-          ? labelFor(destinationById(grant.destinationId) as StudioDestination)
-          : grant.destinationId,
+        reconnectRequired: grant.reconnectRequired,
       }))
     },
   }

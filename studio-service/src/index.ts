@@ -1,4 +1,4 @@
-import { createPublicKey } from "node:crypto"
+import { createPublicKey, type KeyObject } from "node:crypto"
 import { S3PublishStorage } from "../../backend/src/site-manager/s3-adapter.ts"
 import { DESTINATIONS } from "./destinations.ts"
 import { handle, type HandlerDeps } from "./handler.ts"
@@ -48,7 +48,7 @@ const deps: HandlerDeps | null = configured
     }
   : null
 
-const keys = new Map<string, ReturnType<typeof createPublicKey>>()
+const keys = new Map<string, KeyObject>()
 
 const jwks = async (kid: string) => {
   const cached = keys.get(kid)
@@ -63,25 +63,57 @@ const jwks = async (kid: string) => {
   return key
 }
 
-type LambdaEvent = {
+export type LambdaEvent = {
   rawPath?: string
   rawQueryString?: string
   headers?: Record<string, string | undefined>
   body?: string | null
   isBase64Encoded?: boolean
-  requestContext?: { http?: { method?: string } }
+  requestContext?: { http?: { method?: string }; domainName?: string }
 }
 
-export const handler = async (event: LambdaEvent) => {
-  if (!deps) {
-    return {
-      statusCode: 503,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        error: { code: "site_unavailable", message: "The publishing service is not configured." },
-      }),
+const LAMBDA_URL_HOST = /^[a-z0-9]+\.lambda-url\.us-east-2\.on\.aws$/
+
+/**
+ * STUDIO_PUBLIC_ORIGIN wins when it is set. A set but unusable value refuses
+ * the process rather than falling through to a header. Otherwise only the
+ * domain API Gateway puts on a Function URL event is trusted.
+ */
+export const resolvePublicOrigin = (
+  configuredOrigin: string | undefined,
+  domainName: string | undefined,
+): string | null | "invalid" => {
+  const raw = configuredOrigin?.trim() ?? ""
+  if (raw) {
+    try {
+      const url = new URL(raw)
+      const bare = url.protocol === "https:" && url.username === "" && url.password === ""
+        && (url.pathname === "/" || url.pathname === "") && url.search === "" && url.hash === ""
+      return bare ? url.origin : "invalid"
+    } catch {
+      return "invalid"
     }
   }
+  if (domainName && LAMBDA_URL_HOST.test(domainName)) return `https://${domainName}`
+  return null
+}
+
+const notConfigured = () => ({
+  statusCode: 503,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    error: { code: "site_unavailable", message: "The publishing service is not configured." },
+  }),
+})
+
+export const serve = async (
+  event: LambdaEvent,
+  service: HandlerDeps | null,
+  env: { publicOrigin?: string },
+) => {
+  if (!service) return notConfigured()
+  const origin = resolvePublicOrigin(env.publicOrigin, event.requestContext?.domainName)
+  if (origin === "invalid") return notConfigured()
   const headers = new Headers()
   for (const [name, value] of Object.entries(event.headers ?? {})) {
     if (value !== undefined) headers.set(name, value)
@@ -95,10 +127,13 @@ export const handler = async (event: LambdaEvent) => {
     headers,
     body: method === "GET" || method === "HEAD" ? undefined : body,
   })
-  const response = await handle(request, deps)
+  const response = await handle(request, service, origin)
   return {
     statusCode: response.status,
     headers: Object.fromEntries(response.headers),
     body: await response.text(),
   }
 }
+
+export const handler = async (event: LambdaEvent) =>
+  serve(event, deps, { publicOrigin: process.env.STUDIO_PUBLIC_ORIGIN })

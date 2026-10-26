@@ -256,11 +256,14 @@ test("revocation and rotation are enforced without a deploy", async () => {
   const grants = await rig.service.list(rig.identity(ADMIN))
   const target = grants.find((item) => item.destinationId === "dionysus-savior-sounds")
   assert.ok(target)
-  const rotated = await rig.service.rotate(rig.identity(ADMIN), target.id)
+  const cut = await rig.service.forceReconnect(rig.identity(ADMIN), target.id)
+  assert.equal(cut.reconnectRequired, true)
+  assert.equal("token" in cut, false)
   await assert.rejects(
     () => rig.service.begin(`Bearer ${rotatable.token}`, audio("dionysus-savior-sounds")),
     (error: { status: number }) => error.status === 401,
   )
+  const rotated = await rig.service.rotateOwn(rig.identity(VIZ), target.id)
   const again = await rig.service.begin(`Bearer ${rotated.token}`, audio("dionysus-savior-sounds"))
   await rig.service.complete(`Bearer ${rotated.token}`, again.uploadReceipt)
 })

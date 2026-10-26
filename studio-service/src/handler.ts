@@ -56,7 +56,18 @@ const readJson = async (request: Request) => {
  * be talked into a mutation by another site. The publishing token is a
  * different bearer from the sign-in token and is checked in the service.
  */
-export const handle = async (request: Request, deps: HandlerDeps): Promise<Response> => {
+/**
+ * `publicOrigin` is the address the phone will call. It is never taken from
+ * the Host header: a caller who can set that header must not be able to point
+ * a connection string at a site they control. Null refuses the two calls that
+ * hand a connection to a person, before any invite is consumed or any grant
+ * changes.
+ */
+export const handle = async (
+  request: Request,
+  deps: HandlerDeps,
+  publicOrigin: string | null = null,
+): Promise<Response> => {
   const url = new URL(request.url)
   const origin = request.headers.get("origin")
   const allow = origin !== null && deps.allowedOrigins.includes(origin)
@@ -70,6 +81,13 @@ export const handle = async (request: Request, deps: HandlerDeps): Promise<Respo
     : {}
   if (request.method === "OPTIONS") {
     return new Response(null, { status: allow ? 204 : 403, headers: cors })
+  }
+
+  const requireOrigin = () => {
+    if (!publicOrigin) {
+      throw new SiteManagerError(503, "site_unavailable", "The publishing service has no public address yet.")
+    }
+    return publicOrigin
   }
 
   try {
@@ -92,13 +110,24 @@ export const handle = async (request: Request, deps: HandlerDeps): Promise<Respo
       const body = await readJson(request)
       return json(201, await deps.service.createInvite(identity, body), cors)
     }
+    if (request.method === "POST" && path === "/me/invites/view") {
+      const body = await readJson(request)
+      return json(200, await deps.service.viewInvite(identity, body.inviteId), cors)
+    }
     if (request.method === "POST" && path === "/admin/invites/accept") {
+      const endpoint = requireOrigin()
       const body = await readJson(request)
       const accepted = await deps.service.acceptInvite(identity, body.inviteId)
-      return json(201, {
-        ...accepted,
-        connection: connectionDocument(url.origin, accepted),
-      }, cors)
+      return json(201, { ...accepted, connection: connectionDocument(endpoint, accepted) }, cors)
+    }
+    if (request.method === "GET" && path === "/me/grants") {
+      return json(200, { grants: await deps.service.listOwn(identity) }, cors)
+    }
+    if (request.method === "POST" && path === "/me/grants/rotate") {
+      const endpoint = requireOrigin()
+      const body = await readJson(request)
+      const rotated = await deps.service.rotateOwn(identity, body.grantId)
+      return json(200, { ...rotated, connection: connectionDocument(endpoint, rotated) }, cors)
     }
     if (request.method === "GET" && path === "/admin/grants") {
       return json(200, { grants: await deps.service.list(identity) }, cors)
@@ -109,8 +138,7 @@ export const handle = async (request: Request, deps: HandlerDeps): Promise<Respo
     }
     if (request.method === "POST" && path === "/admin/grants/rotate") {
       const body = await readJson(request)
-      const rotated = await deps.service.rotate(identity, body.grantId)
-      return json(200, rotated, cors)
+      return json(200, await deps.service.forceReconnect(identity, body.grantId), cors)
     }
     return json(404, { error: { code: "not_found", message: "Nothing is published at that path." } }, cors)
   } catch (error) {
@@ -121,7 +149,7 @@ export const handle = async (request: Request, deps: HandlerDeps): Promise<Respo
   }
 }
 
-const connectionDocument = (
+export const connectionDocument = (
   endpoint: string,
   accepted: { token: string; destination: { id: string; artistName: string; siteHost: string; section: string; pageUrl: string }; prefix: string },
 ) => {

@@ -25,8 +25,24 @@ export type S3AdapterConfig = {
  */
 export class S3PublishStorage implements PublishStorage {
   private readonly client: S3Client
+  /**
+   * Declared and assigned rather than written as a constructor parameter
+   * property, so this file can be read by a runtime that only STRIPS types.
+   *
+   * A parameter property is not a type annotation: it emits an assignment, so
+   * Node's type stripping refuses it outright with
+   * ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX. That made this file unimportable from
+   * `node --test`, which is how the studio service's flow test reaches it.
+   *
+   * It matters beyond the test. OFF-RENDER-ADMIN.md ports this directory to a
+   * Lambda, away from Medusa's build - and the whole reason that port is
+   * cheap is that site-manager is framework-independent. One line of syntax
+   * only a transpiler understands quietly undoes that.
+   */
+  private readonly config: S3AdapterConfig
 
-  constructor(private readonly config: S3AdapterConfig, client?: S3Client) {
+  constructor(config: S3AdapterConfig, client?: S3Client) {
+    this.config = config
     this.client = client ?? new S3Client({
       region: config.region,
       endpoint: config.endpoint,
