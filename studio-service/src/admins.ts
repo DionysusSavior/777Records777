@@ -13,9 +13,16 @@ export type AdminStore = {
   read(): Promise<AdminState | null>;
   write(expected: number | null, state: AdminState): Promise<boolean>;
 };
-export const memoryAdminStore = (): AdminStore => {
+export const memoryAdminStore = (): AdminStore & {
+  holds(sub: string, version: number): boolean;
+} => {
   let state: AdminState | null = null;
   return {
+    holds(sub, version) {
+      return (
+        state?.version === version && state.members.some((member) => member.sub === sub)
+      );
+    },
     async read() {
       return structuredClone(state);
     },
@@ -72,7 +79,9 @@ export const createAdminService = (
   };
   return {
     async authorize(identity: StudioIdentity) {
-      requireMember(await store.read(), identity);
+      const state = await store.read();
+      requireMember(state, identity);
+      return state!.version;
     },
     async status(identity: StudioIdentity) {
       const state = await store.read();

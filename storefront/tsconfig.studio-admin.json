@@ -9,7 +9,8 @@
     "src/app/admin/**/*.tsx",
     "src/app/studio-admin/**/*.ts",
     "src/app/studio-admin/**/*.tsx",
-    "scripts/test-studio-admin.ts"
+    "scripts/test-studio-admin.ts",
+    "scripts/test-admin-people.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

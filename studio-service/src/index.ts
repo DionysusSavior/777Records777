@@ -67,19 +67,31 @@ const depsFor = (receiptSecret: string): HandlerDeps => {
 }
 
 const keys = new Map<string, KeyObject>()
+let keyDirectory: { at: number; keys: Array<{ kid?: string }> } | null = null
 
-const jwks = async (kid: string) => {
+/** Unknown key ids must not each trigger their own fetch. A minute is enough for a rotation to show up. */
+export const clearStudioJwks = () => {
+  keys.clear()
+  keyDirectory = null
+}
+
+export const readStudioSigningKey = async (kid: string, now = Date.now()) => {
   const cached = keys.get(kid)
   if (cached) return cached
-  const response = await fetch(`${issuer}/.well-known/jwks.json`)
-  if (!response.ok) throw new Error("The sign-in keys could not be read.")
-  const body = await response.json() as { keys?: Array<{ kid?: string }> }
-  const jwk = body.keys?.find((key) => key.kid === kid)
+  if (!keyDirectory || now - keyDirectory.at > 60_000) {
+    const response = await fetch(`${issuer}/.well-known/jwks.json`)
+    if (!response.ok) throw new Error("The sign-in keys could not be read.")
+    const body = await response.json() as { keys?: Array<{ kid?: string }> }
+    keyDirectory = { at: now, keys: body.keys ?? [] }
+  }
+  const jwk = keyDirectory.keys.find((key) => key.kid === kid)
   if (!jwk) throw new Error("The sign-in token is not valid.")
   const key = createPublicKey({ key: jwk as never, format: "jwk" })
   keys.set(kid, key)
   return key
 }
+
+const jwks = (kid: string) => readStudioSigningKey(kid)
 
 export type LambdaEvent = {
   rawPath?: string

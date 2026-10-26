@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createAdminService, memoryAdminStore } from "../src/admins.ts";
 import { dynamoAdminStore } from "../src/admin-store.ts";
+import { dynamoGrantStore } from "../src/aws.ts";
 import { createStudioService, memoryGrantStore } from "../src/grants.ts";
 import { handle } from "../src/handler.ts";
+import { clearStudioJwks, readStudioSigningKey } from "../src/index.ts";
 const owner = {
   sub: "owner",
   email: "owner@example.test",
@@ -122,6 +124,58 @@ test("cancelling or replacing an invitation invalidates its old link", async () 
   await people.cancel(owner, id(second.acceptUrl));
   await assert.rejects(people.accept(other, id(second.acceptUrl)));
 });
+test("removal wins if it lands after publishing authorization and before the invitation is stored", async () => {
+  const roster = memoryAdminStore();
+  const people = createAdminService(roster, new Set([owner.sub, other.sub]));
+  await people.setup(owner);
+  const inner = memoryGrantStore(roster);
+  let release: () => void = () => {};
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let proceed: () => void = () => {};
+  const resume = new Promise<void>((resolve) => {
+    proceed = resolve;
+  });
+  const store = {
+    ...inner,
+    async putInvite(invite: Parameters<typeof inner.putInvite>[0], admin?: Parameters<typeof inner.putInvite>[1]) {
+      release();
+      await resume;
+      return inner.putInvite(invite, admin);
+    },
+  };
+  const service = createStudioService({
+    admins: new Set([owner.sub, other.sub]),
+    authorizeAdmin: (identity) => people.authorize(identity),
+    store,
+    manifests: {
+      async read() {
+        return null;
+      },
+      async write() {
+        return { etag: "test" };
+      },
+    },
+    storage: {
+      async issueUpload() {
+        throw new Error("unused");
+      },
+      async inspectUpload() {
+        return null;
+      },
+    },
+    receiptSecret: "test-only-secret-with-at-least-32-characters",
+  });
+  const pending = service.createInvite(other, {
+    destinationId: "viz-sounds",
+    recipientEmail: "viz@example.test",
+  });
+  await opened;
+  await people.remove(owner, other.sub);
+  proceed();
+  await assert.rejects(pending, /not a studio administrator/);
+});
 test("dynamic membership gates publishing administration without creating publishing rights", async () => {
   const people = createAdminService(
     memoryAdminStore(),
@@ -187,6 +241,50 @@ test("Dynamo membership uses strong reads and conditional version writes", async
   assert.equal(commands[2].ConditionExpression, "#version = :expected");
   conflict = true;
   assert.equal(await store.write(1, state), false);
+});
+
+test("a publishing invitation records the administrator only in the same roster check as the write", async () => {
+  const commands: Array<{ name: string; input: any }> = [];
+  const client = {
+    async send(command: { constructor: { name: string }; input: any }) {
+      commands.push({ name: command.constructor.name, input: command.input });
+      return {};
+    },
+  };
+  const store = dynamoGrantStore("Grants", client as any);
+  await store.putInvite(
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      destinationId: "viz-sounds",
+      recipientEmail: "viz@example.test",
+      expiresAt: 1,
+      consumedAt: null,
+    },
+    { sub: other.sub, version: 3 }
+  );
+  const check = commands[0].input.TransactItems[0].ConditionCheck;
+  assert.equal(check.Key.pk, "admin-roster");
+  assert.match(check.ConditionExpression, /contains\(#subs, :sub\)/);
+  assert.equal(check.ExpressionAttributeValues[":version"], 3);
+  assert.equal(check.ExpressionAttributeValues[":sub"], other.sub);
+});
+
+test("unknown signing keys share one key-set fetch", async () => {
+  let calls = 0;
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ keys: [] }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    clearStudioJwks();
+    await assert.rejects(readStudioSigningKey("kid-a", 1_000), /not valid/);
+    await assert.rejects(readStudioSigningKey("kid-b", 1_000), /not valid/);
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = original;
+    clearStudioJwks();
+  }
 });
 
 test("HTTP admin setup and invitations require identity and never grant publishing", async () => {

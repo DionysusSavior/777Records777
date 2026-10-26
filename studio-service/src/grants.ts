@@ -50,8 +50,11 @@ export type StudioInvite = {
  * changes made from one snapshot cannot both land. A token and the pointer
  * that finds it change together or not at all. Nothing un-revokes a grant.
  */
+/** The roster version observed when this caller was confirmed as an administrator. */
+export type AdminProof = { sub: string; version: number }
+
 export interface GrantStore {
-  putInvite(invite: StudioInvite): Promise<void>
+  putInvite(invite: StudioInvite, admin?: AdminProof): Promise<void>
   getInvite(id: string): Promise<StudioInvite | null>
   /**
    * Consumes the invite and creates the grant and its token pointer at once.
@@ -68,9 +71,9 @@ export interface GrantStore {
   /** New token, next version, reconnect cleared. Throws `conflict` unless `expected` is current and unrevoked. */
   rotateGrant(expected: StudioGrant, tokenSha256: string): Promise<StudioGrant>
   /** No token, next version, reconnect required. Throws `conflict` on the same terms as rotateGrant. */
-  forceReconnect(expected: StudioGrant): Promise<StudioGrant>
+  forceReconnect(expected: StudioGrant, admin?: AdminProof): Promise<StudioGrant>
   /** Final and idempotent. Retries past a concurrent change instead of losing to it. Null for an unknown grant. */
-  revokeGrant(grantId: string, now: number): Promise<StudioGrant | null>
+  revokeGrant(grantId: string, now: number, admin?: AdminProof): Promise<StudioGrant | null>
   /** Counts one begin in the window. False, without counting, once `limit` are counted. */
   noteBegin(input: { grantId: string; windowStart: number; limit: number; expiresAt: number }): Promise<boolean>
 }
@@ -78,7 +81,9 @@ export interface GrantStore {
 export const grantConflict = () =>
   new SiteManagerError(409, "conflict", "The grant changed. Reload and try again.")
 
-export const memoryGrantStore = (): GrantStore => {
+export const memoryGrantStore = (roster?: {
+  holds(sub: string, version: number): boolean
+}): GrantStore => {
   const invites = new Map<string, StudioInvite>()
   const grants = new Map<string, StudioGrant>()
   const pointers = new Map<string, string>()
@@ -103,8 +108,14 @@ export const memoryGrantStore = (): GrantStore => {
     return found ? { ...found } : null
   }
 
+  const hold = (admin?: AdminProof) => {
+    if (!admin) return
+    if (!roster?.holds(admin.sub, admin.version)) throw grantConflict()
+  }
+
   return {
-    async putInvite(invite) {
+    async putInvite(invite, admin) {
+      hold(admin)
       invites.set(invite.id, { ...invite })
     },
     async getInvite(id) {
@@ -144,11 +155,13 @@ export const memoryGrantStore = (): GrantStore => {
       const found = current(expected)
       return commit(found, { ...found, tokenSha256, version: found.version + 1, reconnectRequired: false })
     },
-    async forceReconnect(expected) {
+    async forceReconnect(expected, admin) {
+      hold(admin)
       const found = current(expected)
       return commit(found, { ...found, tokenSha256: null, version: found.version + 1, reconnectRequired: true })
     },
-    async revokeGrant(grantId, now) {
+    async revokeGrant(grantId, now, admin) {
+      hold(admin)
       const found = grants.get(grantId)
       if (!found) return null
       if (found.revokedAt !== null) return { ...found }
@@ -195,7 +208,7 @@ export const createStudioService = (options: {
   storage: PublishStorage
   receiptSecret: string
   admins: ReadonlySet<string>
-  authorizeAdmin?: (identity: StudioIdentity) => Promise<void>
+  authorizeAdmin?: (identity: StudioIdentity) => Promise<number>
   now?: () => number
   freshnessMs?: number
   mintToken?: () => string
@@ -206,11 +219,26 @@ export const createStudioService = (options: {
   const mintToken = options.mintToken ?? (() => randomBytes(32).toString("base64url"))
   const cache = new Map<string, { grant: StudioGrant; at: number }>()
 
-  const requireAdmin = async (identity: StudioIdentity) => {
-    if (options.authorizeAdmin) return options.authorizeAdmin(identity)
+  const requireAdmin = async (identity: StudioIdentity): Promise<AdminProof | null> => {
+    if (options.authorizeAdmin) {
+      return { sub: identity.sub, version: await options.authorizeAdmin(identity) }
+    }
     if (!options.admins.has(identity.sub)) {
       throw new SiteManagerError(403, "forbidden", "This account is not a studio administrator.")
     }
+    return null
+  }
+
+  const asAdmin = async <T>(identity: StudioIdentity, run: (admin: AdminProof | null) => Promise<T>): Promise<T> => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const admin = await requireAdmin(identity)
+      try {
+        return await run(admin)
+      } catch (error) {
+        if (!(error instanceof SiteManagerError) || error.code !== "conflict" || attempt === 7) throw error
+      }
+    }
+    throw grantConflict()
   }
 
   const requireEmail = (value: unknown) => {
@@ -363,7 +391,6 @@ export const createStudioService = (options: {
     },
     complete: manager.complete,
     async createInvite(identity: StudioIdentity, body: { destinationId?: unknown; recipientEmail?: unknown }) {
-      await requireAdmin(identity)
       const destination = destinationById(body.destinationId)
       if (!destination) {
         throw new SiteManagerError(400, "invalid_request", "Choose one artist and one section.")
@@ -376,7 +403,7 @@ export const createStudioService = (options: {
         expiresAt: now() + INVITE_TTL_MS,
         consumedAt: null,
       }
-      await options.store.putInvite(invite)
+      await asAdmin(identity, (admin) => options.store.putInvite(invite, admin ?? undefined))
       const acceptUrl = `${ADMIN_PAGE}?invite=${encodeURIComponent(invite.id)}`
       let mailed = false
       if (options.sendInvite) {
@@ -474,20 +501,18 @@ export const createStudioService = (options: {
       return issued(next, token, destination)
     },
     async revoke(identity: StudioIdentity, grantId: unknown) {
-      await requireAdmin(identity)
       const id = requireId(grantId, "Name the grant to revoke.")
-      const revoked = await options.store.revokeGrant(id, now())
+      const revoked = await asAdmin(identity, (admin) => options.store.revokeGrant(id, now(), admin ?? undefined))
       if (!revoked) throw grantNotFound()
       forgetGrant(id)
       return { grantId: id, revoked: true }
     },
     /** The administrator never sees the artist's token. The holder fetches a new one with rotateOwn. */
     async forceReconnect(identity: StudioIdentity, grantId: unknown) {
-      await requireAdmin(identity)
       const id = requireId(grantId, "Name the grant to rotate.")
       const grant = await options.store.getGrant(id)
       if (!grant || grant.revokedAt !== null) throw grantNotFound()
-      const next = await options.store.forceReconnect(grant)
+      const next = await asAdmin(identity, (admin) => options.store.forceReconnect(grant, admin ?? undefined))
       forgetGrant(grant.id)
       return { grantId: next.id, version: next.version, reconnectRequired: true }
     },

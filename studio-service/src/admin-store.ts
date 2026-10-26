@@ -25,7 +25,12 @@ export const dynamoAdminStore = (
       await client.send(
         new PutCommand({
           TableName: tableName,
-          Item: { pk: "admin-roster", version: state.version, state },
+          Item: {
+            pk: "admin-roster",
+            version: state.version,
+            subs: state.members.map((member) => member.sub),
+            state,
+          },
           ConditionExpression:
             expected === null
               ? "attribute_not_exists(pk)"

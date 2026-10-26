@@ -10,7 +10,7 @@ import {
   type TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb"
 import type { ManifestStore } from "./catalogue.ts"
-import { grantConflict, type GrantStore, type StudioGrant, type StudioInvite } from "./grants.ts"
+import { grantConflict, type AdminProof, type GrantStore, type StudioGrant, type StudioInvite } from "./grants.ts"
 
 /**
  * The grants table is the studio's. It is not the OM7 directory table.
@@ -71,6 +71,16 @@ export const dynamoGrantStore = (
     return item
   }
 
+  const adminStill = (admin: AdminProof) => ({
+    ConditionCheck: {
+      TableName: tableName,
+      Key: { pk: "admin-roster" },
+      ConditionExpression: "#version = :version AND contains(#subs, :sub)",
+      ExpressionAttributeNames: { "#version": "version", "#subs": "subs" },
+      ExpressionAttributeValues: { ":version": admin.version, ":sub": admin.sub },
+    },
+  })
+
   const getGrant = async (id: string) => {
     const found = await client.send(new GetCommand({
       TableName: tableName,
@@ -81,10 +91,24 @@ export const dynamoGrantStore = (
   }
 
   return {
-    async putInvite(invite) {
+    async putInvite(invite, admin) {
       const item: Record<string, unknown> = { ...inviteKey(invite.id), ...invite, kind: "invite" }
       if (invite.consumedAt === null) delete item.consumedAt
-      await client.send(new PutCommand({ TableName: tableName, Item: item }))
+      if (!admin) {
+        await client.send(new PutCommand({ TableName: tableName, Item: item }))
+        return
+      }
+      try {
+        await client.send(new TransactWriteCommand({
+          TransactItems: [
+            adminStill(admin),
+            { Put: { TableName: tableName, Item: item, ConditionExpression: "attribute_not_exists(pk)" } },
+          ],
+        }))
+      } catch (error) {
+        if (!canceled(error)) throw error
+        throw grantConflict()
+      }
     },
     async getInvite(id) {
       const found = await client.send(new GetCommand({
@@ -214,8 +238,9 @@ export const dynamoGrantStore = (
         reconnectRequired: false,
       }
     },
-    async forceReconnect(expected) {
+    async forceReconnect(expected, admin) {
       const items: TransactWriteCommandInput["TransactItems"] = [
+        ...(admin ? [adminStill(admin)] : []),
         {
           Update: {
             TableName: tableName,
@@ -243,7 +268,9 @@ export const dynamoGrantStore = (
       try {
         await client.send(new TransactWriteCommand({ TransactItems: items }))
       } catch (error) {
-        if (!canceled(error)) throw error
+        const reasons = canceled(error)
+        if (!reasons) throw error
+        if (admin && reasons[0]?.Code === "ConditionalCheckFailed") throw grantConflict()
         throw grantConflict()
       }
       return {
@@ -253,12 +280,13 @@ export const dynamoGrantStore = (
         reconnectRequired: true,
       }
     },
-    async revokeGrant(grantId, now) {
+    async revokeGrant(grantId, now, admin) {
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const grant = await getGrant(grantId)
         if (!grant) return null
         if (grant.revokedAt !== null) return grant
         const items: TransactWriteCommandInput["TransactItems"] = [
+          ...(admin ? [adminStill(admin)] : []),
           {
             Update: {
               TableName: tableName,
@@ -287,7 +315,9 @@ export const dynamoGrantStore = (
           await client.send(new TransactWriteCommand({ TransactItems: items }))
           return { ...grant, tokenSha256: null, version: grant.version + 1, revokedAt: now }
         } catch (error) {
-          if (!canceled(error)) throw error
+          const reasons = canceled(error)
+          if (!reasons) throw error
+          if (admin && reasons[0]?.Code === "ConditionalCheckFailed") throw grantConflict()
         }
       }
       throw grantConflict()
