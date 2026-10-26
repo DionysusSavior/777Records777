@@ -181,6 +181,73 @@ test("accept with no trustworthy origin does not consume the invite", async () =
   assert.equal(still.status, 200)
 })
 
+/**
+ * A Lambda event in, a decoded connection out.
+ *
+ * The connection document tells a phone where to publish for as long as the
+ * grant lives, so the endpoint inside it is the one value in this service that
+ * must never come from the caller. An earlier version built it from the
+ * request URL, which on a Function URL means the Host header - so anyone able
+ * to send a request could mint a connection pointing a phone at their own
+ * host. These two tests are the contract: the event decides, and a header
+ * cannot argue with it.
+ */
+const acceptThrough = async (
+  service: HandlerDeps,
+  event: Partial<LambdaEvent>,
+  env: { publicOrigin?: string },
+) => {
+  const created = await call(service, "POST", "/admin/invites", tokenFor(ADMIN), {
+    destinationId: "viz-sounds",
+    recipientSub: VIZ,
+  })
+  assert.equal(created.status, 201)
+  return serve(
+    {
+      ...event,
+      rawPath: "/admin/invites/accept",
+      // Merged last and deliberately: a spread of `event` would replace the
+      // whole headers object and quietly drop the authorization, which fails
+      // as a 401 that looks nothing like the thing under test.
+      headers: {
+        authorization: `Bearer ${tokenFor(VIZ)}`,
+        "content-type": "application/json",
+        origin: "https://777records777.studio",
+        ...(event.headers ?? {}),
+      },
+      body: JSON.stringify({ inviteId: created.body.inviteId }),
+      requestContext: { http: { method: "POST" }, ...(event.requestContext ?? {}) },
+    } as LambdaEvent,
+    service,
+    env,
+  )
+}
+
+test("the connection endpoint comes from the event, and a Host header cannot move it", async () => {
+  const response = await acceptThrough(
+    deps(),
+    {
+      headers: { host: "attacker.example.com", "x-forwarded-host": "attacker.example.com" },
+      requestContext: { http: { method: "POST" }, domainName: "abc123.lambda-url.us-east-2.on.aws" },
+    },
+    {},
+  )
+  assert.equal(response.statusCode, 201)
+  const { endpoint } = decode((JSON.parse(response.body) as { connection: string }).connection)
+  assert.equal(endpoint, "https://abc123.lambda-url.us-east-2.on.aws/")
+})
+
+test("a configured public origin wins over the event's own domain", async () => {
+  const response = await acceptThrough(
+    deps(),
+    { requestContext: { http: { method: "POST" }, domainName: "abc123.lambda-url.us-east-2.on.aws" } },
+    { publicOrigin: "https://publish.777records777.studio" },
+  )
+  assert.equal(response.statusCode, 201)
+  const { endpoint } = decode((JSON.parse(response.body) as { connection: string }).connection)
+  assert.equal(endpoint, "https://publish.777records777.studio/")
+})
+
 test("an unusable configured origin refuses to serve", async () => {
   const refused = await serve({ rawPath: "/discovery", requestContext: { http: { method: "GET" } } }, deps(), {
     publicOrigin: "http://studio.internal/extra",
