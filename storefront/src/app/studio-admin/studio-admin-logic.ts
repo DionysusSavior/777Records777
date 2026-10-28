@@ -185,6 +185,43 @@ export async function completeSignIn(
   }
 }
 
+/**
+ * Copies text during the tap, the same way selecting it by hand does.
+ *
+ * `navigator.clipboard` rejects on this site and the rejection was ignored, so
+ * the button looked dead. The selection has to happen before the click ends;
+ * waiting on the clipboard promise is too late for the browser to allow it.
+ */
+export function copyText(value: string, doc: Document = document): boolean {
+  if (value.length === 0) return false
+  const area = doc.createElement("textarea")
+  area.value = value
+  area.style.position = "fixed"
+  area.style.top = "0"
+  area.style.left = "0"
+  area.style.opacity = "0"
+  area.style.fontSize = "16px"
+  doc.body.appendChild(area)
+  area.contentEditable = "true"
+  area.readOnly = false
+  const range = doc.createRange()
+  range.selectNodeContents(area)
+  const selection = doc.getSelection()
+  if (selection) {
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+  area.setSelectionRange(0, value.length)
+  let copied = false
+  try {
+    copied = doc.execCommand("copy")
+  } catch {
+    copied = false
+  }
+  doc.body.removeChild(area)
+  return copied
+}
+
 /** Removes everything sign-in and invitations put in the address bar. Null when there is nothing to remove. */
 export const stripPageParams = (href: string) => {
   const url = new URL(href)

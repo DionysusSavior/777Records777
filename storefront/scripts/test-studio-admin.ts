@@ -13,6 +13,7 @@ import {
   createInvitation,
   loadInvite,
   pageReducer,
+  copyText,
   recipientProblem,
   signedOutState,
   studioClient,
@@ -39,6 +40,37 @@ const memory = (): SessionStore => {
     removeItem: (key) => { values.delete(key) },
   }
 }
+
+const copied: string[] = []
+const copyDoc = {
+  body: {
+    appendChild() {},
+    removeChild() {},
+  },
+  createElement() {
+    const area = {
+      value: "",
+      style: { position: "", top: "", left: "", opacity: "", fontSize: "" },
+      contentEditable: "",
+      readOnly: true,
+      setSelectionRange(start: number, end: number) {
+        copied.push(area.value.slice(start, end))
+      },
+    }
+    return area
+  },
+  createRange() {
+    return { selectNodeContents() {} }
+  },
+  getSelection() {
+    return { removeAllRanges() {}, addRange() {} }
+  },
+  execCommand() {
+    return true
+  },
+} as unknown as Document
+check("copy takes the whole publishing token", copyText("om7-studio:abc", copyDoc) && copied[0] === "om7-studio:abc")
+check("an empty copy does nothing", copyText("", copyDoc) === false)
 
 check("an account id is not an email", recipientProblem("51bb9540-0011-70a3-becb-946be0f408af") !== null)
 check("a real email is", recipientProblem("Viz@Example.test") === null)

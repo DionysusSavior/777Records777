@@ -17,6 +17,7 @@ import {
   removeAccess,
   renewConnection,
   sectionsFor,
+  copyText,
   signOut,
   signedOutState,
   studioClient,
@@ -53,6 +54,7 @@ export default function StudioAdmin({
   const [destinationId, setDestinationId] = useState(destinations[0].id)
   const [email, setEmail] = useState("")
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState<"connection" | "link" | null>(null)
   const sections = sectionsFor(config, state)
 
   useEffect(() => {
@@ -174,8 +176,15 @@ export default function StudioAdmin({
             {" "}Paste this into OM7 Player, under Publish. It is shown once.
           </p>
           <textarea readOnly value={state.connection.value} className="h-32 rounded border border-white/20 bg-black p-3 text-xs" />
-          <button type="button" className={quiet} onClick={() => void navigator.clipboard.writeText(state.connection?.value ?? "")}>
-            Copy
+          <button
+            type="button"
+            className={quiet}
+            onClick={() => {
+              const copiedOk = copyText(state.connection?.value ?? "")
+              setCopied(copiedOk ? "connection" : null)
+            }}
+          >
+            {copied === "connection" ? "Copied" : "Copy"}
           </button>
           <button type="button" className="w-fit text-xs uppercase tracking-[0.14em] text-white/70" onClick={() => dispatch({ type: "connection-dismissed" })}>
             Dismiss
@@ -244,8 +253,15 @@ export default function StudioAdmin({
                   : `The invitation for ${state.created.label} exists, but the email could not be sent. Copy the link. It expires ${formatExpiry(state.created.expiresAt)}.`}
               </p>
               <textarea readOnly value={state.created.acceptUrl} className="h-20 rounded border border-white/20 bg-black p-3 text-xs" />
-              <button type="button" className={quiet} onClick={() => void navigator.clipboard.writeText(state.created?.acceptUrl ?? "")}>
-                Copy link
+              <button
+                type="button"
+                className={quiet}
+                onClick={() => {
+                  const copiedOk = copyText(state.created?.acceptUrl ?? "")
+                  setCopied(copiedOk ? "link" : null)
+                }}
+              >
+                {copied === "link" ? "Copied" : "Copy link"}
               </button>
             </div>
           )}
