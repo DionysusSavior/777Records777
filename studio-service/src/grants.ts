@@ -5,12 +5,13 @@ import {
   type PublishStorage,
   type PublishedObject,
 } from "../../backend/src/site-manager/core.ts"
-import { commitCatalogue, type ManifestStore } from "./catalogue.ts"
+import { commitCatalogue, commitRemoval, listCatalogue, type ManifestStore } from "./catalogue.ts"
 import {
   DESTINATIONS,
   UPLOAD_TTL_SECONDS,
   destinationById,
   labelFor,
+  objectKeyFor,
   type StudioDestination,
 } from "./destinations.ts"
 
@@ -213,6 +214,7 @@ export const createStudioService = (options: {
   freshnessMs?: number
   mintToken?: () => string
   sendInvite?: (message: { to: string; acceptUrl: string; label: string }) => Promise<void>
+  deleteObject?: (key: string) => Promise<void>
 }) => {
   const now = options.now ?? Date.now
   const freshnessMs = options.freshnessMs ?? GRANT_FRESHNESS_MS
@@ -515,6 +517,39 @@ export const createStudioService = (options: {
       const next = await asAdmin(identity, (admin) => options.store.forceReconnect(grant, admin ?? undefined))
       forgetGrant(grant.id)
       return { grantId: next.id, version: next.version, reconnectRequired: true }
+    },
+    async catalogue(authorization: string | undefined, destinationId: unknown) {
+      const scope = await resolveGrant(authorization, destinationId)
+      const destination = destinationById(scope.destinationId)
+      if (!destination) {
+        throw new SiteManagerError(403, "destination_denied", "That is not a publishing destination on this site.")
+      }
+      const current = await options.manifests.read(destination.manifestKey)
+      return { entries: listCatalogue(current?.body ?? null, destination.section) }
+    },
+    async removePublished(authorization: string | undefined, destinationId: unknown, url: unknown) {
+      if (typeof url !== "string") {
+        throw new SiteManagerError(400, "invalid_request", "Name the file to remove.")
+      }
+      const scope = await resolveGrant(authorization, destinationId)
+      const destination = destinationById(scope.destinationId)
+      if (!destination) {
+        throw new SiteManagerError(403, "destination_denied", "That is not a publishing destination on this site.")
+      }
+      const key = objectKeyFor(destination, url)
+      if (!key) {
+        throw new SiteManagerError(403, "destination_denied", "That file is not on this page.")
+      }
+      await commitRemoval(
+        options.manifests,
+        destination.manifestKey,
+        { url, section: destination.section },
+        new Date(now()).toISOString(),
+      )
+      if (options.deleteObject) {
+        await options.deleteObject(key)
+      }
+      return { removed: true }
     },
     async list(identity: StudioIdentity) {
       await requireAdmin(identity)

@@ -98,6 +98,20 @@ export const handle = async (
       return json(200, deps.service.discovery(), cors)
     }
 
+    if (request.method === "GET" && path === "/catalogue") {
+      return json(200, await deps.service.catalogue(
+        request.headers.get("authorization") ?? undefined,
+        url.searchParams.get("destinationId"),
+      ), cors)
+    }
+    if (request.method === "POST" && path === "/catalogue/remove") {
+      const body = await readJson(request)
+      return json(200, await deps.service.removePublished(
+        request.headers.get("authorization") ?? undefined,
+        body.destinationId,
+        body.url,
+      ), cors)
+    }
     if (request.method === "POST" && path === "/uploads") {
       const body = await readJson(request)
       return json(201, await deps.service.begin(request.headers.get("authorization") ?? undefined, body), cors)

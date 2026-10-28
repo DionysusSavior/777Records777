@@ -59,6 +59,22 @@ export const destinationById = (id: unknown): StudioDestination | null => {
   return DESTINATIONS.find((item) => item.id === id) ?? null
 }
 
+/** The object key for a URL on this destination, or null if it is not one of its files. */
+export const objectKeyFor = (destination: StudioDestination, url: string): string | null => {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  const base = new URL(destination.publicBaseUrl)
+  if (parsed.protocol !== "https:" || parsed.host !== base.host) return null
+  const key = decodeURIComponent(parsed.pathname.replace(/^\//, ""))
+  const prefix = `${destination.prefix}/`
+  if (!key.startsWith(prefix) || key.includes("..") || key.endsWith("/index.json")) return null
+  return key
+}
+
 export const labelFor = (destination: StudioDestination) =>
   `${destination.artistName} → ${destination.siteHost} → ${destination.section === "movies" ? "Movies" : "Sounds"}`
 

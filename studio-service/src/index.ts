@@ -1,6 +1,7 @@
 import { createAdminService } from "./admins.ts"
 import { dynamoAdminStore } from "./admin-store.ts"
 import { createPublicKey, type KeyObject } from "node:crypto"
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager"
 import { S3PublishStorage } from "../../backend/src/site-manager/s3-adapter.ts"
 import { DESTINATIONS } from "./destinations.ts"
@@ -52,6 +53,10 @@ const depsFor = (receiptSecret: string): HandlerDeps => {
     admins,
     authorizeAdmin: people.authorize,
     sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
+    deleteObject: async (key) => {
+      const objects = new S3Client({ region: DESTINATIONS[0].region })
+      await objects.send(new DeleteObjectCommand({ Bucket: DESTINATIONS[0].bucket, Key: key }))
+    },
   }),
   allowedOrigins: ["https://777records777.studio"],
   verifyIdentity: (authorization) => {

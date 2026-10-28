@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
 import type { PublishStorage, StoredUpload, UploadDescriptor } from "../../backend/src/site-manager/core.ts"
-import { applyCatalogue, type ManifestStore } from "../src/catalogue.ts"
-import { UPLOAD_TTL_NOTE } from "../src/destinations.ts"
+import { applyCatalogue, listCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { destinationById, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle } from "../src/handler.ts"
 import { IdentityError, verifyIdToken } from "../src/identity.ts"
@@ -392,6 +392,34 @@ test("an ID token is checked, and a pool member is not thereby an admin", async 
     () => rig.service.createInvite(identity, { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL }),
     (error: { status: number }) => error.status === 403,
   )
+})
+
+test("a sound can be listed and removed without touching movies or inventing releases", () => {
+  const url = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/11111111-1111-4111-8111-111111111111.mp3"
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [{
+      id: "11111111-1111-4111-8111-111111111111",
+      kind: "audio",
+      title: "In Time",
+      url,
+      contentType: "audio/mpeg",
+      bytes: 1,
+      publishedAt: "2026-10-28T00:00:00.000Z",
+    }],
+    movies: [{ id: "film", title: "Time Machine", url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/film.mp4", poster: "", bytes: 2, publishedAt: "2026-10-28T00:00:00.000Z" }],
+  })
+  assert.equal(listCatalogue(raw, "sounds")[0]?.title, "In Time")
+  assert.equal(listCatalogue(raw, "movies")[0]?.title, "Time Machine")
+  const destination = destinationById("viz-sounds")
+  assert.ok(destination)
+  assert.equal(objectKeyFor(destination, url), "site-manager/viz/11111111-1111-4111-8111-111111111111.mp3")
+  assert.equal(objectKeyFor(destination, "https://example.test/other.mp3"), null)
+  const next = JSON.parse(removeFromCatalogue(raw, { url, section: "sounds" }, "2026-10-28T01:00:00.000Z"))
+  assert.equal(next.items.length, 0)
+  assert.equal(next.releases, undefined)
+  assert.equal(next.movies.length, 1)
 })
 
 test("catalogue apply refuses a malformed manifest and keeps both additions", () => {

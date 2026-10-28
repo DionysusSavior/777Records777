@@ -122,26 +122,7 @@ const MediaOrPlaceholder = ({
 
   if (placeholder === "audio") {
     return (
-      <div
-        className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/[0.08] via-transparent to-white/[0.03] text-white/70"
-        aria-label="Audio artwork placeholder"
-      >
-        <svg
-          width="42"
-          height="42"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M9 18V5l10-2v13" />
-          <circle cx="6" cy="18" r="3" />
-          <circle cx="16" cy="16" r="3" />
-        </svg>
-      </div>
+      <div className="absolute inset-0 bg-black" aria-label="No artwork" />
     )
   }
 

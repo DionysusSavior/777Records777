@@ -57,7 +57,7 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
                   className="h-full w-full object-contain transition duration-500 group-hover:scale-[1.03]"
                 />
               ) : (
-                <span className="absolute inset-0 bg-white/5" />
+                <span className="absolute inset-0 bg-black" />
               )}
 
               <span className="absolute inset-0 flex items-center justify-center">

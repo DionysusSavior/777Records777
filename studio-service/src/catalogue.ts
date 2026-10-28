@@ -158,6 +158,118 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
   return { body: JSON.stringify(source), unchanged: false }
 }
 
+export type CatalogueEntry = { id: string; title: string; url: string }
+
+const textOf = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null)
+
+const parseCatalogue = (raw: string) => {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new CatalogueError(409, "catalogue_malformed", "The catalogue could not be read, so it was left unchanged.")
+  }
+  if (
+    !isRecord(parsed) ||
+    parsed.protocol !== PROTOCOL ||
+    parsed.version !== VERSION ||
+    !Array.isArray(parsed.items)
+  ) {
+    throw new CatalogueError(409, "catalogue_malformed", "The catalogue could not be read, so it was left unchanged.")
+  }
+  return parsed
+}
+
+/** What that destination's page is showing. A missing manifest is an empty page, not an error. */
+export const listCatalogue = (raw: string | null, section: "sounds" | "movies"): CatalogueEntry[] => {
+  if (raw === null || raw.trim() === "") return []
+  const source = parseCatalogue(raw)
+  if (section === "movies") {
+    if (!Array.isArray(source.movies)) return []
+    return source.movies.flatMap((movie) => {
+      if (!isRecord(movie)) return []
+      const url = textOf(movie.url)
+      const title = textOf(movie.title)
+      const id = textOf(movie.id)
+      return url && title && id ? [{ id, title, url }] : []
+    })
+  }
+  const items = (source.items as unknown[]).filter(isRecord)
+  if (Array.isArray(source.releases)) {
+    return source.releases.flatMap((release) => {
+      if (!isRecord(release) || release.visible === false) return []
+      const audioId = textOf(release.audio)
+      const audio = items.find((item) => item.id === audioId && item.kind === "audio")
+      const url = audio ? textOf(audio.url) : null
+      const title = textOf(release.title)
+      const id = textOf(release.id)
+      return url && title && id ? [{ id, title, url }] : []
+    })
+  }
+  return items.flatMap((item) => {
+    if (item.kind !== "audio") return []
+    const url = textOf(item.url)
+    const title = textOf(item.title)
+    const id = textOf(item.id)
+    return url && title && id ? [{ id, title, url }] : []
+  })
+}
+
+/**
+ * Take one published URL off the page. Does not invent a `releases` array.
+ * A Sounds removal also drops any release that used that file. A Movies
+ * removal never touches Sounds.
+ */
+export const removeFromCatalogue = (
+  raw: string,
+  target: { url: string; section: "sounds" | "movies" },
+  updatedAt: string,
+) => {
+  const source = parseCatalogue(raw)
+  if (target.section === "movies") {
+    const movies = Array.isArray(source.movies) ? source.movies.filter(isRecord) : []
+    const next = movies.filter((movie) => movie.url !== target.url)
+    if (next.length === movies.length) {
+      throw new CatalogueError(404, "not_found", "That file is not on this page.")
+    }
+    source.movies = next
+    source.updatedAt = updatedAt
+    return JSON.stringify(source)
+  }
+  const items = (source.items as unknown[]).filter(isRecord)
+  const removed = items.filter((item) => item.url === target.url)
+  if (removed.length === 0) {
+    throw new CatalogueError(404, "not_found", "That file is not on this page.")
+  }
+  const removedIds = new Set(removed.map((item) => item.id))
+  source.items = items.filter((item) => item.url !== target.url)
+  if (Array.isArray(source.releases)) {
+    source.releases = source.releases.filter((release) => {
+      if (!isRecord(release)) return false
+      const ids = [release.audio, release.reel, release.artwork, release.bundle]
+      return !ids.some((id) => typeof id === "string" && removedIds.has(id))
+    })
+  }
+  source.updatedAt = updatedAt
+  return JSON.stringify(source)
+}
+
+export const commitRemoval = async (
+  store: ManifestStore,
+  manifestKey: string,
+  target: { url: string; section: "sounds" | "movies" },
+  updatedAt: string,
+) => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const current = await store.read(manifestKey)
+    if (!current) throw new CatalogueError(404, "not_found", "That file is not on this page.")
+    const body = removeFromCatalogue(current.body, target, updatedAt)
+    const written = await store.write(manifestKey, body, current.etag)
+    if ("etag" in written) return
+  }
+  throw new CatalogueError(409, "catalogue_conflict", "The page changed while that file was being removed. Try again.")
+}
+
 export const commitCatalogue = async (
   store: ManifestStore,
   manifestKey: string,
