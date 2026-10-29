@@ -19,6 +19,47 @@ const json = (status: number, body: unknown, extra: Record<string, string> = {})
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra },
   })
 
+/**
+ * Why a request did not succeed, in CloudWatch.
+ *
+ * A handled error used to become JSON and leave no trace at all: the log held
+ * START, END and REPORT and nothing else, so a 403 from the wrong destination,
+ * a 401 from a stale credential and a 409 from a malformed manifest were
+ * indistinguishable from outside. Diagnosing one meant guessing, and the guess
+ * was wrong more than once.
+ *
+ * What is NOT logged, deliberately: the Authorization header, any request
+ * body, and anything derived from either. A publishing credential in
+ * CloudWatch is a credential leaked to anyone who can read the log group, and
+ * this service exists to keep OM7 out of the artist's trust path. The
+ * destination id is logged because it names a page, not a secret.
+ */
+const note = (
+  request: Request,
+  url: URL,
+  status: number,
+  code: string,
+  message: string,
+  unexpected?: unknown,
+) => {
+  const line = JSON.stringify({
+    at: "site-manager",
+    method: request.method,
+    path: url.pathname,
+    destinationId: url.searchParams.get("destinationId") ?? undefined,
+    status,
+    code,
+    message,
+  })
+  if (unexpected === undefined) {
+    console.warn(line)
+    return
+  }
+  // An unexpected error is the one case where the stack is worth the bytes:
+  // nothing else in the response says where it came from.
+  console.error(line, unexpected instanceof Error ? unexpected.stack : unexpected)
+}
+
 const fail = (error: unknown) => {
   if (error instanceof SiteManagerError || error instanceof CatalogueError) {
     return json(error.status, { error: { code: error.code, message: error.message } })
@@ -168,9 +209,19 @@ export const handle = async (
       const body = await readJson(request)
       return json(200, await deps.service.forceReconnect(identity, body.grantId), cors)
     }
+    note(request, url, 404, "not_found", "Nothing is published at that path.")
     return json(404, { error: { code: "not_found", message: "Nothing is published at that path." } }, cors)
   } catch (error) {
     const response = fail(error)
+    const known = error instanceof SiteManagerError || error instanceof CatalogueError
+    note(
+      request,
+      url,
+      response.status,
+      known ? error.code : error instanceof IdentityError ? "unauthorized" : "unhandled",
+      error instanceof Error ? error.message : String(error),
+      known || error instanceof IdentityError ? undefined : error,
+    )
     const headers = new Headers(response.headers)
     for (const [name, value] of Object.entries(cors)) headers.set(name, value)
     return new Response(response.body, { status: response.status, headers })
