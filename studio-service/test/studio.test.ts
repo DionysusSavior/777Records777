@@ -4,6 +4,7 @@ import { test } from "node:test"
 import type { PublishStorage, StoredUpload, UploadDescriptor } from "../../backend/src/site-manager/core.ts"
 import { applyCatalogue, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
+import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
 import { destinationById, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle } from "../src/handler.ts"
@@ -423,6 +424,93 @@ test("a sound can be listed and removed without touching movies or inventing rel
   assert.equal(next.movies.length, 1)
 })
 
+test("what the service writes, the website accepts - bundle included", () => {
+  /*
+   The guard this file did not have.
+
+   Every other test here asks whether the manifest is what this service meant
+   to write. None asked whether the WEBSITE would take it, and the two have
+   separate rules: the storefront's parser rejects a manifest in which an item
+   id is also a release id, because one id must name one thing, and it rejects
+   the WHOLE manifest rather than the offending row.
+
+   A bundle's key is its release - that is what makes a rebuild overwrite
+   rather than orphan a 70 MB object - and `itemId` reads an id off the key,
+   so the bundle item arrived carrying the release's own id. The first bundle
+   anybody built would have taken that artist's entire Site Manager shelf off
+   their page, films included, while the upload reported success. Caught by
+   running the real parser, which is why it is imported here rather than
+   restated.
+  */
+  const manifestUrl = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/index.json"
+  const base = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion"
+  const release = "036b3a02-7a65-44d9-9e6f-a5bdc7b820ae"
+  const at = "2026-10-29T00:00:00.000Z"
+
+  const publish = (raw: string | null, over: Record<string, unknown>) =>
+    applyCatalogue(raw, {
+      contentLength: 1,
+      checksumSha256: checksum,
+      destinationId: "dionysus-savior-sounds",
+      section: "sounds",
+      releaseId: release,
+      ...over,
+    } as never, at).body
+
+  // A manifest with no `releases` array never grows one - that is deliberate,
+  // and documented in applyCatalogue - so the page starts as a release page.
+  const seeded = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: at,
+    items: [],
+    releases: [],
+  })
+
+  let raw = publish(seeded, {
+    key: `${release.replace("036b", "11cc")}.wav`,
+    publicUrl: `${base}/${release.replace("036b", "11cc")}.wav`,
+    title: "IN TIME",
+    contentType: "audio/wav",
+    mediaKind: "audio",
+  })
+  assert.ok(parseSiteManagerManifest(raw, manifestUrl), "the audio alone is accepted")
+
+  // The bundle's key IS the release. That is deliberate and must stay.
+  raw = publish(raw, {
+    key: `${release}.om7`,
+    publicUrl: `${base}/${release}.om7`,
+    title: "IN TIME",
+    contentType: "application/octet-stream",
+    mediaKind: "bundle",
+  })
+
+  const written = JSON.parse(raw)
+  const bundle = written.items.find((item: { kind: string }) => item.kind === "bundle")
+  assert.equal(written.releases.length, 1, "the bundle joined the release, it did not start one")
+  assert.equal(written.releases[0].bundle, bundle.id)
+  assert.notEqual(bundle.id, written.releases[0].id, "an item id is never a release id")
+
+  const parsed = parseSiteManagerManifest(raw, manifestUrl)
+  assert.ok(parsed, "the website still accepts the manifest once a bundle is in it")
+  assert.equal(parsed.items.length, 2)
+  assert.equal(parsed.releases?.length, 1)
+
+  // Same release, rebuilt: same key, same id, still accepted, still one item.
+  const again = publish(raw, {
+    key: `${release}.om7`,
+    publicUrl: `${base}/${release}.om7`,
+    title: "IN TIME",
+    contentType: "application/octet-stream",
+    mediaKind: "bundle",
+    contentLength: 2,
+  })
+  const rebuilt = JSON.parse(again)
+  assert.equal(rebuilt.items.length, 2, "a rebuild replaces the bundle, it does not add one")
+  assert.equal(rebuilt.items.find((i: { kind: string }) => i.kind === "bundle").id, bundle.id)
+  assert.ok(parseSiteManagerManifest(again, manifestUrl), "and the rebuild is still accepted")
+})
+
 test("the page list names the commerce releases too, and refuses to remove one", () => {
   /*
    The phone's list read the manifest and nothing else, so a page carrying
@@ -565,7 +653,11 @@ test("a rebuilt bundle replaces itself instead of orphaning the last one", () =>
   assert.equal(manifest.items.length, 1, "one bundle, not an orphan beside it")
   assert.equal(manifest.items[0].bytes, 250, "the size describes what is in storage")
   assert.equal(manifest.releases.length, 1)
-  assert.equal(manifest.releases[0].bundle, releaseId)
+  // The release POINTS AT the bundle item; it is not the same id. The key is
+  // still the release - that is what makes the rebuild overwrite - but an id
+  // that named both would make the website reject the whole manifest.
+  assert.equal(manifest.releases[0].bundle, manifest.items[0].id)
+  assert.notEqual(manifest.items[0].id, releaseId)
 })
 
 test("a retried completion of anything else is still unchanged", () => {

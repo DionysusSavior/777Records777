@@ -173,6 +173,12 @@ type Receipt = {
 
 const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> = {
   "audio/aac": { extension: "aac", kinds: ["audio"] },
+  // The phone's picker offers AIFF, its own type table maps it, the website's
+  // manifest parser accepts it and the bundle script reads it. This table was
+  // the only place that did not know about it, so choosing a master in the
+  // format Logic exports answered 415 after the file had been chosen.
+  "audio/aiff": { extension: "aiff", kinds: ["audio"] },
+  "audio/x-aiff": { extension: "aiff", kinds: ["audio"] },
   "audio/flac": { extension: "flac", kinds: ["audio"] },
   "audio/m4a": { extension: "m4a", kinds: ["audio"] },
   "audio/mp4": { extension: "m4a", kinds: ["audio"] },

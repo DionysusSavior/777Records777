@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import type { PublishedObject } from "../../backend/src/site-manager/core.ts"
 
 const PROTOCOL = "om7.site-manager.manifest"
@@ -52,6 +52,35 @@ const itemId = (key: string) => {
     throw new CatalogueError(500, "catalogue_key", "The stored object key is not a catalogue id.")
   }
   return id.toLowerCase()
+}
+
+/**
+ * A bundle's item id, derived from its release and NOT equal to it.
+ *
+ * A bundle's object key is its release - that is what makes a rebuild
+ * overwrite instead of orphaning a 70 MB object - and `itemId` reads an id
+ * off the key. So the bundle item arrived carrying the release's own id, and
+ * the website refuses a manifest where an item id is also a release id
+ * (`itemIds.has(release.id)` in the storefront's parser): one id must name
+ * one thing. The refusal is the WHOLE manifest, so the first bundle anybody
+ * built would have taken that artist's entire Site Manager shelf off their
+ * page, films included, with the upload reporting success.
+ *
+ * Version 5 over a fixed namespace, so it is still derived from the release
+ * and still the same on every rebuild - the two properties the deterministic
+ * key was for - while being a different UUID from the release's own.
+ */
+const BUNDLE_NAMESPACE = "7f3e2a10-5c4b-4d8e-9a16-0b2c3d4e5f60"
+
+const bundleItemId = (releaseId: string) => {
+  const digest = createHash("sha1")
+    .update(Buffer.from(BUNDLE_NAMESPACE.replace(/-/g, ""), "hex"))
+    .update(Buffer.from(releaseId.toLowerCase(), "utf8"))
+    .digest()
+  digest[6] = (digest[6] & 0x0f) | 0x50
+  digest[8] = (digest[8] & 0x3f) | 0x80
+  const hex = digest.subarray(0, 16).toString("hex")
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
 }
 
 const kindFor = (published: PublishedObject): ManifestItem["kind"] => {
@@ -149,7 +178,9 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
   }
 
   const item: ManifestItem = {
-    id: itemId(published.key),
+    id: published.mediaKind === "bundle" && published.releaseId
+      ? bundleItemId(published.releaseId)
+      : itemId(published.key),
     kind: kindFor(published),
     title: published.title,
     url: published.publicUrl,
