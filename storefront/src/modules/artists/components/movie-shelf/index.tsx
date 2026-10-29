@@ -3,7 +3,6 @@
 import type { Movie } from "@lib/artists"
 import { useCallback, useRef, useState } from "react"
 
-import ScrollRail from "@modules/common/components/scroll-rail"
 import MovieStage from "./stage"
 
 // Decimal units, because that is what Finder and the iPhone Files app report.
@@ -11,14 +10,46 @@ const formatSize = (bytes: number) =>
   bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`
 
 /**
- * The full videos, with the file one click away.
+ * The tallest a poster may stand, as a share of the window.
  *
- * Tapping one lifts it into the middle of the screen the way a sound panel
- * does, sharing that flight through `useStageFlight`. In the rail itself a
- * movie is a poster and nothing more: no `controls`, no `src`, and
- * `preload="none"`, so a page visit pulls none of the video. A rail of five
- * movies that each began loading on sight would cost hundreds of megabytes
- * before anybody asked for one.
+ * Not 100: a film that filled the window exactly would give no sign that
+ * another one follows it, and the page would read as ending at each poster.
+ */
+const TALLEST = 82
+
+/**
+ * A film's width over its height, for working out how wide it may grow.
+ *
+ * Portrait, like the older entries, when the ratio cannot be read - which is
+ * the same default the poster box itself falls back to.
+ */
+const widthOverHeight = (aspect: string) => {
+  const [width, height] = aspect.split("/").map((part) => Number(part.trim()))
+  return Number.isFinite(width) && Number.isFinite(height) && height > 0
+    ? width / height
+    : 9 / 16
+}
+
+/**
+ * The full videos, stacked down the page, with the file one click away.
+ *
+ * These were a horizontal rail, a slot of it 22vw wide on a desktop. A film
+ * shown a fifth of the window across is a thumbnail of a film, and the two
+ * New Deal cuts are 16:9 - the shape that suffers most from a narrow slot,
+ * because its height falls away with its width. Dion asked for them down the
+ * page instead, and down the page each one gets the whole column.
+ *
+ * Each poster keeps its own framing and is bounded by HEIGHT rather than by
+ * width, which is what lets one rule serve both shapes. A 16:9 cut is held
+ * by the column and fills it. A 9:16 reel would be twice the window tall at
+ * that width, so its height cap binds first and it settles to roughly a
+ * screen tall, centred, at its own proportions. Neither is letterboxed and
+ * neither is cropped.
+ *
+ * A movie here is still a poster and nothing more: no `controls`, no `src`,
+ * and `preload="none"`, so a page visit pulls none of the video. Tapping one
+ * lifts it into the middle of the screen the way a sound panel does, sharing
+ * that flight through `useStageFlight`.
  *
  * The size stays on the download button because it is large enough to matter
  * on a phone plan, and the visitor should know before the download starts.
@@ -28,7 +59,7 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
   const slots = useRef(new Map<string, HTMLElement | null>())
 
   /**
-   * Read on demand rather than captured, because the rail can be scrolled
+   * Read on demand rather than captured, because the page can be scrolled
    * while the stage is open and a captured rect would fly the panel home to
    * where its slot used to be.
    */
@@ -36,8 +67,10 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
 
   return (
     <>
-      <ScrollRail>
-        {movies.map((movie) => (
+      <div className="flex flex-col gap-16">
+        {movies.map((movie) => {
+          const aspect = movie.aspectRatio ?? "9 / 16"
+          return (
           <div key={movie.url} data-testid="movie-wrapper">
             <button
               type="button"
@@ -46,8 +79,11 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
               }}
               onClick={() => setOpen(movie)}
               aria-label={`Watch ${movie.title}`}
-              className="group relative block w-full overflow-hidden rounded-large bg-black"
-              style={{ aspectRatio: movie.aspectRatio ?? "9 / 16" }}
+              className="group relative mx-auto block w-full overflow-hidden rounded-large bg-black"
+              style={{
+                aspectRatio: aspect,
+                maxWidth: `calc(${TALLEST}vh * ${widthOverHeight(aspect)})`,
+              }}
             >
               {movie.poster ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -69,7 +105,10 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
               </span>
             </button>
 
-            <div className="mt-4 flex flex-col items-start gap-3">
+            <div
+              className="mx-auto mt-5 flex w-full flex-col items-start gap-3"
+              style={{ maxWidth: `calc(${TALLEST}vh * ${widthOverHeight(aspect)})` }}
+            >
               <span className="luxury-title text-[0.86rem] leading-relaxed tracking-[0.045em] text-white">
                 {movie.title}
               </span>
@@ -90,8 +129,9 @@ export default function MovieShelf({ movies }: { movies: Movie[] }) {
               </a>
             </div>
           </div>
-        ))}
-      </ScrollRail>
+          )
+        })}
+      </div>
 
       {open && (
         <MovieStage
