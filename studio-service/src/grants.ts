@@ -531,7 +531,10 @@ export const createStudioService = (options: {
           current?.body ?? null,
           destination.section,
           storeItemsFor(destination),
-          "the admin portal",
+          // Where it actually is. A film on the Movies page is a few lines in
+          // the website's own source, not a product anybody can open in the
+          // admin portal, and sending the artist there would waste a trip.
+          destination.section === "movies" ? "the site's code" : "the admin portal",
         ),
       }
     },
