@@ -157,7 +157,17 @@ export const serve = async (
   const body = event.body
     ? (event.isBase64Encoded ? Buffer.from(event.body, "base64") : event.body)
     : undefined
-  const request = new Request(`https://studio.internal${event.rawPath ?? "/"}`, {
+  /*
+   rawQueryString, not just rawPath. It was declared on LambdaEvent and never
+   read, so every query parameter was dropped between the Function URL and the
+   handler. Only one route reads one - GET /catalogue, for destinationId - so
+   the symptom was narrow and misleading: destinationById(null) returns null
+   and the route answers 403 destination_denied, which reads as a credential
+   problem rather than a lost parameter. Publishing was unaffected throughout
+   because every other route carries its arguments in the body.
+  */
+  const query = event.rawQueryString ? `?${event.rawQueryString}` : ""
+  const request = new Request(`https://studio.internal${event.rawPath ?? "/"}${query}`, {
     method,
     headers,
     body: method === "GET" || method === "HEAD" ? undefined : body,

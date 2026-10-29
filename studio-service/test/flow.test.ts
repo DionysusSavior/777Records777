@@ -281,4 +281,27 @@ test("an unusable configured origin refuses to serve", async () => {
   assert.equal(refused.statusCode, 503)
 })
 
+test("a query parameter survives the Lambda event", async () => {
+  /*
+   The adapter built its Request from rawPath alone and never read
+   rawQueryString, so every query parameter was dropped on the way in. Only
+   one route takes one - GET /catalogue, for destinationId - and losing it
+   turned into 403 destination_denied, which reads as a rejected credential
+   rather than a parameter that never arrived. Every serve() test passed
+   rawPath only, so nothing here ever exercised it.
+
+   No bearer is sent. The point is WHICH refusal comes back: the destination
+   is resolved before the credential is, so a destinationId that arrived
+   gives 401 unauthorized and one that was dropped gives 403
+   destination_denied. That difference is the regression.
+  */
+  const response = await serve({
+    rawPath: "/catalogue",
+    rawQueryString: "destinationId=dionysus-savior-sounds",
+    requestContext: { http: { method: "GET" } },
+  }, deps(), {})
+  assert.equal(response.statusCode, 401)
+  assert.equal(response.body.includes("destination_denied"), false)
+})
+
 void (null as KeyObject | null)
