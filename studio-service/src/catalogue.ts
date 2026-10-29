@@ -159,13 +159,20 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
   }
   source.items = [...items, item]
   if (Array.isArray(source.releases)) {
-    const role = published.mediaKind === "reel"
-      ? "reel"
-      : published.mediaKind === "artwork"
-        ? "artwork"
-        : published.mediaKind === "bundle"
-          ? "bundle"
-          : "audio"
+    /*
+     Named, not defaulted.
+
+     This read "anything that is not a reel, artwork or a bundle is the
+     audio", which is true of the only kind that reaches here and would stop
+     being true the moment another one did - filing it as the song and
+     overwriting the real one. A kind with no role takes no slot; the file is
+     still in `items` and still on the page.
+    */
+    const role = published.mediaKind === "audio" ? "audio"
+      : published.mediaKind === "reel" ? "reel"
+      : published.mediaKind === "artwork" ? "artwork"
+      : published.mediaKind === "bundle" ? "bundle"
+      : null
     /*
      Attach, or start one.
 
@@ -180,7 +187,7 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
      starts a release under that id rather than a random one, which is what
      makes the order of the four uploads stop mattering.
     */
-    const existing = published.releaseId
+    const existing = role === null ? -1 : published.releaseId
       ? source.releases.findIndex((r) => isRecord(r) && r.id === published.releaseId)
       : -1
     if (existing >= 0) {
@@ -197,7 +204,7 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
         [role]: item.id,
         publishedAt,
       })
-    } else {
+    } else if (role !== null) {
       source.releases = [
         ...source.releases,
         {
