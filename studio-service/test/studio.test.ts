@@ -422,6 +422,95 @@ test("a sound can be listed and removed without touching movies or inventing rel
   assert.equal(next.movies.length, 1)
 })
 
+test("a reel joins its audio when both carry the same release id", () => {
+  /*
+   Every completion used to append a release with one role filled, so a song
+   and the reel that plays behind it arrived as two entries and nothing could
+   pair them. The id travels inside the signed receipt.
+  */
+  const releaseId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+  const base = {
+    contentLength: 1,
+    checksumSha256: checksum,
+    destinationId: "viz-sounds" as const,
+    section: "sounds" as const,
+    releaseId,
+  }
+  const empty = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [],
+    releases: [],
+  })
+
+  // The reel lands first, which is the order that used to break it.
+  const afterReel = applyCatalogue(empty, {
+    ...base,
+    key: "site-manager/viz/22222222-2222-4222-8222-222222222222.mp4",
+    publicUrl: "https://example.test/loop.mp4",
+    mediaKind: "reel",
+    contentType: "video/mp4",
+    downloadName: "loop.mp4",
+    title: "In Time (loop)",
+  }, "2026-10-28T00:00:00.000Z").body
+
+  const afterAudio = applyCatalogue(afterReel, {
+    ...base,
+    key: "site-manager/viz/33333333-3333-4333-8333-333333333333.mp3",
+    publicUrl: "https://example.test/in-time.mp3",
+    mediaKind: "audio",
+    contentType: "audio/mpeg",
+    downloadName: "in-time.mp3",
+    title: "In Time",
+  }, "2026-10-28T00:01:00.000Z").body
+
+  const manifest = JSON.parse(afterAudio)
+  assert.equal(manifest.items.length, 2)
+  assert.equal(manifest.releases.length, 1, "one song, not two")
+  const release = manifest.releases[0]
+  assert.equal(release.id, releaseId)
+  assert.equal(release.audio, "33333333-3333-4333-8333-333333333333")
+  assert.equal(release.reel, "22222222-2222-4222-8222-222222222222")
+  // The audio names the song even though the reel was published first.
+  assert.equal(release.title, "In Time")
+  // And the page lists it once.
+  assert.equal(listCatalogue(afterAudio, "sounds").length, 1)
+})
+
+test("without a release id each file is still its own release", () => {
+  const empty = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [],
+    releases: [],
+  })
+  const one = applyCatalogue(empty, {
+    key: "site-manager/viz/44444444-4444-4444-8444-444444444444.mp3",
+    publicUrl: "https://example.test/one.mp3",
+    mediaKind: "audio",
+    contentType: "audio/mpeg",
+    contentLength: 1,
+    checksumSha256: checksum,
+    downloadName: "one.mp3",
+    title: "One",
+    destinationId: "viz-sounds",
+    section: "sounds",
+  }, "2026-10-28T00:00:00.000Z").body
+  const two = applyCatalogue(one, {
+    key: "site-manager/viz/55555555-5555-4555-8555-555555555555.mp3",
+    publicUrl: "https://example.test/two.mp3",
+    mediaKind: "audio",
+    contentType: "audio/mpeg",
+    contentLength: 1,
+    checksumSha256: checksum,
+    downloadName: "two.mp3",
+    title: "Two",
+    destinationId: "viz-sounds",
+    section: "sounds",
+  }, "2026-10-28T00:01:00.000Z").body
+  assert.equal(JSON.parse(two).releases.length, 2)
+})
+
 test("catalogue apply refuses a malformed manifest and keeps both additions", () => {
   assert.throws(
     () => applyCatalogue("{", {

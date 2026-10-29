@@ -112,6 +112,14 @@ export type PublishedObject = {
   title: string
   destinationId: string
   section: PublishSection
+  /**
+   * The release these files belong to, when the phone said so.
+   *
+   * Absent means what it always meant: this file is a release of its own.
+   * Present means attach it to that release instead of starting another, so
+   * a reel and its audio stop arriving as two unrelated songs.
+   */
+  releaseId?: string
 }
 
 export type SiteManagerConfig = {
@@ -154,6 +162,13 @@ type Receipt = {
   grantVersion?: number
   section?: PublishSection
   title?: string
+  /**
+   * Carried HERE and not re-read from the completion body on purpose. The
+   * receipt is HMAC-signed, so a caller cannot move a file onto a release
+   * that is not theirs by editing a request; the id is fixed at the moment
+   * the upload was authorised.
+   */
+  releaseId?: string
 }
 
 const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> = {
@@ -194,6 +209,8 @@ const canonicalSha256 = (value: unknown) => {
     return null
   }
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const publicUrlFor = (base: string, key: string) => {
   const path = key.split("/").map(encodeURIComponent).join("/")
@@ -251,7 +268,9 @@ const decodeReceipt = (value: unknown, secret: string): Receipt => {
       typeof receipt.grantId === "string" &&
       typeof receipt.grantVersion === "number" &&
       (receipt.section === "sounds" || receipt.section === "movies") &&
-      typeof receipt.title === "string"
+      typeof receipt.title === "string" &&
+      (receipt.releaseId === undefined ||
+        (typeof receipt.releaseId === "string" && UUID.test(receipt.releaseId)))
     )
     if (!baseOk || !grantOk) {
       throw new Error("bad shape")
@@ -337,6 +356,20 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       throw new SiteManagerError(400, "invalid_checksum", "checksumSha256 must be a base64-encoded SHA-256 digest.")
     }
 
+    /*
+     Optional, and a UUID when it is there. It becomes an id inside the
+     manifest, so an arbitrary string would let a caller choose how its
+     release is addressed and collide with one already published.
+    */
+    const releaseId = raw.releaseId === undefined || raw.releaseId === null
+      ? undefined
+      : typeof raw.releaseId === "string" && UUID.test(raw.releaseId)
+        ? raw.releaseId.toLowerCase()
+        : null
+    if (releaseId === null) {
+      throw new SiteManagerError(400, "invalid_request", "releaseId must be a UUID.")
+    }
+
     // The client filename is deliberately not used as a storage key. Besides
     // path traversal, same-origin HTML/SVG uploads would turn storage into an
     // executable-content surface. The allowlisted MIME type chooses the suffix.
@@ -373,6 +406,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
             grantVersion: scope.grantVersion,
             section: scope.section,
             title,
+            ...(releaseId ? { releaseId } : {}),
           }
         : {}),
     }
@@ -440,6 +474,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
         title: receipt.title || "Untitled",
         destinationId: scope.destinationId,
         section: scope.section,
+        releaseId: receipt.releaseId,
       })
       pageUrl = published.pageUrl
     }

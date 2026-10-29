@@ -138,21 +138,54 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
         : published.mediaKind === "bundle"
           ? "bundle"
           : "audio"
-    source.releases = [
-      ...source.releases,
-      {
-        id: randomUUID(),
-        title: published.title,
-        audio: role === "audio" ? item.id : null,
-        reel: role === "reel" ? item.id : null,
-        artwork: role === "artwork" ? item.id : null,
-        bundle: role === "bundle" ? item.id : null,
-        price: null,
-        buyUrl: null,
-        visible: true,
+    /*
+     Attach, or start one.
+
+     Every completion used to append a release with a single role filled and
+     the rest null, because nothing told the service that four uploads were
+     one song. A reel published from the phone became its own entry on the
+     page, beside the audio it belongs behind, and no player could ever know
+     they were the same release.
+
+     The id arrives inside the signed receipt, so a caller cannot name a
+     release that is not theirs to add to. An id that matches nothing here
+     starts a release under that id rather than a random one, which is what
+     makes the order of the four uploads stop mattering.
+    */
+    const existing = published.releaseId
+      ? source.releases.findIndex((r) => isRecord(r) && r.id === published.releaseId)
+      : -1
+    if (existing >= 0) {
+      const release = source.releases[existing] as Record<string, unknown>
+      source.releases = source.releases.map((r, at) => at !== existing ? r : {
+        ...release,
+        // The audio is the song, so it names the release even when the reel
+        // or the artwork was uploaded first. Anything else keeps the title
+        // already there rather than renaming a song after its cover.
+        title: role === "audio" ? published.title : release.title,
+        // A re-upload of the same role replaces the pointer. The item it
+        // replaced stays in `items` and stays downloadable; it is simply no
+        // longer part of this release.
+        [role]: item.id,
         publishedAt,
-      },
-    ]
+      })
+    } else {
+      source.releases = [
+        ...source.releases,
+        {
+          id: published.releaseId ?? randomUUID(),
+          title: published.title,
+          audio: role === "audio" ? item.id : null,
+          reel: role === "reel" ? item.id : null,
+          artwork: role === "artwork" ? item.id : null,
+          bundle: role === "bundle" ? item.id : null,
+          price: null,
+          buyUrl: null,
+          visible: true,
+          publishedAt,
+        },
+      ]
+    }
   }
   source.updatedAt = publishedAt
   return { body: JSON.stringify(source), unchanged: false }
