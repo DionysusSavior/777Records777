@@ -116,8 +116,36 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
   }
 
   const items = source.items as unknown[]
-  if (items.some((item) => isRecord(item) && item.url === published.publicUrl)) {
-    return { body: raw ?? JSON.stringify(source), unchanged: true }
+  const already = items.findIndex((item) => isRecord(item) && item.url === published.publicUrl)
+  if (already >= 0) {
+    /*
+     A retried completion must not add the same file twice, which is what the
+     unchanged answer is for and why it stays for everything else.
+
+     A rebuilt bundle is the one deliberate exception. Its key IS its release,
+     so a second upload is meant to arrive at the same URL carrying different
+     bytes - artwork added, a reel swapped. Returning unchanged there would
+     leave a size and a date describing a file that is no longer in storage.
+    */
+    if (published.mediaKind !== "bundle") {
+      return { body: raw ?? JSON.stringify(source), unchanged: true }
+    }
+    const prior = items[already] as Record<string, unknown>
+    source.items = items.map((item, at) => at !== already ? item : {
+      ...prior,
+      title: published.title,
+      contentType: published.contentType,
+      bytes: published.contentLength,
+      publishedAt,
+    })
+    if (Array.isArray(source.releases) && published.releaseId) {
+      source.releases = source.releases.map((release) =>
+        isRecord(release) && release.id === published.releaseId
+          ? { ...release, bundle: prior.id, publishedAt }
+          : release)
+    }
+    source.updatedAt = publishedAt
+    return { body: JSON.stringify(source), unchanged: false }
   }
 
   const item: ManifestItem = {

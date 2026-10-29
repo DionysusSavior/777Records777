@@ -477,6 +477,71 @@ test("a reel joins its audio when both carry the same release id", () => {
   assert.equal(listCatalogue(afterAudio, "sounds").length, 1)
 })
 
+test("a rebuilt bundle replaces itself instead of orphaning the last one", () => {
+  /*
+   A bundle's key is its release, so the second build lands on the same URL
+   with different bytes. Everything else at a URL already present is a
+   retried completion and must stay unchanged.
+  */
+  const releaseId = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
+  const url = `https://example.test/${releaseId}.om7`
+  const bundle = (bytes: number) => ({
+    key: `site-manager/viz/${releaseId}.om7`,
+    publicUrl: url,
+    mediaKind: "bundle" as const,
+    contentType: "application/zip",
+    contentLength: bytes,
+    checksumSha256: checksum,
+    downloadName: "release.om7",
+    title: "In Time",
+    destinationId: "viz-sounds" as const,
+    section: "sounds" as const,
+    releaseId,
+  })
+  const empty = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [],
+    releases: [],
+  })
+
+  const first = applyCatalogue(empty, bundle(100), "2026-10-28T00:00:00.000Z")
+  assert.equal(first.unchanged, false)
+  const second = applyCatalogue(first.body, bundle(250), "2026-10-28T00:05:00.000Z")
+  assert.equal(second.unchanged, false, "a rebuild is a real change")
+
+  const manifest = JSON.parse(second.body)
+  assert.equal(manifest.items.length, 1, "one bundle, not an orphan beside it")
+  assert.equal(manifest.items[0].bytes, 250, "the size describes what is in storage")
+  assert.equal(manifest.releases.length, 1)
+  assert.equal(manifest.releases[0].bundle, releaseId)
+})
+
+test("a retried completion of anything else is still unchanged", () => {
+  const published = {
+    key: "site-manager/viz/66666666-6666-4666-8666-666666666666.mp3",
+    publicUrl: "https://example.test/retry.mp3",
+    mediaKind: "audio" as const,
+    contentType: "audio/mpeg",
+    contentLength: 1,
+    checksumSha256: checksum,
+    downloadName: "retry.mp3",
+    title: "Retry",
+    destinationId: "viz-sounds" as const,
+    section: "sounds" as const,
+  }
+  const empty = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [],
+    releases: [],
+  })
+  const once = applyCatalogue(empty, published, "2026-10-28T00:00:00.000Z")
+  const twice = applyCatalogue(once.body, published, "2026-10-28T00:05:00.000Z")
+  assert.equal(twice.unchanged, true)
+  assert.equal(JSON.parse(twice.body).items.length, 1)
+})
+
 test("without a release id each file is still its own release", () => {
   const empty = JSON.stringify({
     protocol: "om7.site-manager.manifest",

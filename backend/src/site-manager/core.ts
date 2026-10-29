@@ -375,7 +375,17 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
     // executable-content surface. The allowlisted MIME type chooses the suffix.
     const keyPrefix = scope?.keyPrefix ?? config.keyPrefix
     const publicBaseUrl = scope?.publicBaseUrl ?? config.publicBaseUrl
-    const key = `${keyPrefix}/${randomUUID()}.${type.extension}`
+    /*
+     A bundle is a materialization of its release, not a thing with its own
+     identity, so it is named by the release and rebuilding one overwrites it.
+     A random key would leave a 70 MB orphan in storage every time artwork was
+     added and the bundle rebuilt. Everything else keeps a fresh key: two
+     uploads of the same song are two files, and a client must not be able to
+     choose where a file lands.
+    */
+    const key = mediaKind === "bundle" && releaseId
+      ? `${keyPrefix}/${releaseId}.${type.extension}`
+      : `${keyPrefix}/${randomUUID()}.${type.extension}`
     const downloadName = downloadNameFor(raw.filename, type.extension)
     const title = titleFor(raw.title, downloadName)
     const publicUrl = publicUrlFor(publicBaseUrl, key)
