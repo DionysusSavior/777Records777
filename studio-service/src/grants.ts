@@ -5,7 +5,7 @@ import {
   type PublishStorage,
   type PublishedObject,
 } from "../../backend/src/site-manager/core.ts"
-import { commitCatalogue, commitRemoval, listCatalogue, type ManifestStore } from "./catalogue.ts"
+import { commitCatalogue, commitRemoval, pageCatalogue, type ManifestStore } from "./catalogue.ts"
 import {
   DESTINATIONS,
   UPLOAD_TTL_SECONDS,
@@ -14,6 +14,7 @@ import {
   objectKeyFor,
   type StudioDestination,
 } from "./destinations.ts"
+import { storeItemsFor } from "./page-items.ts"
 
 /**
  * A warm instance may serve a grant it loaded this recently. Revocation is not
@@ -525,7 +526,14 @@ export const createStudioService = (options: {
         throw new SiteManagerError(403, "destination_denied", "That is not a publishing destination on this site.")
       }
       const current = await options.manifests.read(destination.manifestKey)
-      return { entries: listCatalogue(current?.body ?? null, destination.section) }
+      return {
+        entries: pageCatalogue(
+          current?.body ?? null,
+          destination.section,
+          storeItemsFor(destination),
+          "the admin portal",
+        ),
+      }
     },
     async removePublished(authorization: string | undefined, destinationId: unknown, url: unknown) {
       if (typeof url !== "string") {

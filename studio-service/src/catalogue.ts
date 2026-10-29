@@ -219,7 +219,22 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
   return { body: JSON.stringify(source), unchanged: false }
 }
 
-export type CatalogueEntry = { id: string; title: string; url: string }
+/**
+ * One row of what that page is showing.
+ *
+ * `removable` is stated by the service rather than worked out by the caller.
+ * The phone cannot tell a manifest entry from a commerce product by looking
+ * at a title and a URL, and a client that guessed would offer a Remove that
+ * the service is bound to refuse.
+ */
+export type CatalogueEntry = {
+  id: string
+  title: string
+  url: string
+  removable: boolean
+  /** Where it IS managed, when it is not managed here. */
+  managedBy?: string
+}
 
 const textOf = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null)
 
@@ -252,7 +267,7 @@ export const listCatalogue = (raw: string | null, section: "sounds" | "movies"):
       const url = textOf(movie.url)
       const title = textOf(movie.title)
       const id = textOf(movie.id)
-      return url && title && id ? [{ id, title, url }] : []
+      return url && title && id ? [{ id, title, url, removable: true }] : []
     })
   }
   const items = (source.items as unknown[]).filter(isRecord)
@@ -264,7 +279,7 @@ export const listCatalogue = (raw: string | null, section: "sounds" | "movies"):
       const url = audio ? textOf(audio.url) : null
       const title = textOf(release.title)
       const id = textOf(release.id)
-      return url && title && id ? [{ id, title, url }] : []
+      return url && title && id ? [{ id, title, url, removable: true }] : []
     })
   }
   return items.flatMap((item) => {
@@ -272,8 +287,34 @@ export const listCatalogue = (raw: string | null, section: "sounds" | "movies"):
     const url = textOf(item.url)
     const title = textOf(item.title)
     const id = textOf(item.id)
-    return url && title && id ? [{ id, title, url }] : []
+    return url && title && id ? [{ id, title, url, removable: true }] : []
   })
+}
+
+/**
+ * Everything that page is showing, in the order the page shows it.
+ *
+ * The manifest first, because that is what this service published and what it
+ * can take back. Then whatever else stands on the page, reported so the
+ * artist sees their whole shelf and marked so no control is offered that
+ * would fail.
+ *
+ * A declared item whose URL is already in the manifest is dropped rather than
+ * listed twice. The page itself de-duplicates by URL when it merges published
+ * films into the static ones, so doing anything else here would show a row
+ * that does not exist on the page.
+ */
+export const pageCatalogue = (
+  raw: string | null,
+  section: "sounds" | "movies",
+  storeItems: readonly { id: string; title: string; url: string }[],
+  managedBy: string,
+): CatalogueEntry[] => {
+  const published = listCatalogue(raw, section)
+  const seen = new Set(published.map((entry) => entry.url))
+  const rest = storeItems.flatMap((item) =>
+    seen.has(item.url) ? [] : [{ ...item, removable: false, managedBy }])
+  return [...published, ...rest]
 }
 
 /**

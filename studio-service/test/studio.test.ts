@@ -2,7 +2,8 @@ import assert from "node:assert/strict"
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
 import type { PublishStorage, StoredUpload, UploadDescriptor } from "../../backend/src/site-manager/core.ts"
-import { applyCatalogue, listCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { applyCatalogue, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { storeItemsFor } from "../src/page-items.ts"
 import { destinationById, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle } from "../src/handler.ts"
@@ -420,6 +421,56 @@ test("a sound can be listed and removed without touching movies or inventing rel
   assert.equal(next.items.length, 0)
   assert.equal(next.releases, undefined)
   assert.equal(next.movies.length, 1)
+})
+
+test("the page list names the commerce releases too, and refuses to remove one", () => {
+  /*
+   The phone's list read the manifest and nothing else, so a page carrying
+   three songs reported one. Dion saw In Time alone where Gone Crazy and New
+   Deal also stand, which reads as files having been lost rather than as a
+   list being partial.
+
+   Those two are commerce products. This service has no authority over them -
+   its S3 grant is its own prefix - so they are named and marked, and the
+   removal path still refuses them by key rather than by trusting the flag.
+  */
+  const destination = destinationById("dionysus-savior-sounds")
+  assert.ok(destination)
+  const store = storeItemsFor(destination)
+  assert.deepEqual(store.map((item) => item.title), ["Gone Crazy", "New Deal"])
+
+  const published = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/22222222-2222-4222-8222-222222222222.wav"
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [{
+      id: "22222222-2222-4222-8222-222222222222",
+      kind: "audio",
+      title: "DIONYSUS SAVIOR - IN TIME",
+      url: published,
+      contentType: "audio/wav",
+      bytes: 1,
+      publishedAt: "2026-10-29T00:00:00.000Z",
+    }],
+  })
+
+  const entries = pageCatalogue(raw, "sounds", store, "the admin portal")
+  assert.deepEqual(entries.map((entry) => [entry.title, entry.removable]), [
+    ["DIONYSUS SAVIOR - IN TIME", true],
+    ["Gone Crazy", false],
+    ["New Deal", false],
+  ])
+  assert.equal(entries[1]?.managedBy, "the admin portal")
+
+  // What the phone is told, and what the service would actually allow, are
+  // two different checks. A caller that ignores the flag still gets nowhere.
+  for (const item of store) {
+    assert.equal(objectKeyFor(destination, item.url), null)
+  }
+
+  // A declared item already in the manifest is one row, not two.
+  const twice = pageCatalogue(raw, "sounds", [...store, { id: "x", title: "In Time again", url: published }], "the admin portal")
+  assert.equal(twice.length, 3)
 })
 
 test("a reel joins its audio when both carry the same release id", () => {
