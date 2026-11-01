@@ -185,7 +185,31 @@ function ManifestRelease({
   const bundle = itemById(items, release.bundle)
   // A free download beside a Buy button undercuts the sale it sits next to -
   // the same file, free, one tap away. Priced releases get Buy only.
-  const download = release.price == null ? audio ?? bundle : null
+  const free = release.price == null
+  const download = free ? audio ?? bundle : null
+  /*
+   The bundle BESIDE the loose audio, not instead of it.
+
+   `audio ?? bundle` meant an artist who had built a .om7 had no link to it
+   on this page whenever a loose song also existed - which is the ordinary
+   case, because the audio is published first and the bundle is built from
+   it afterwards. The bundle was only ever reachable for a release that had
+   no loose audio at all.
+
+   Offered only when it is not already the download, so a release with no
+   loose audio does not show the same file twice. Withheld on a priced
+   release for the same reason the download is: a free copy of the thing
+   beside its own Buy button.
+
+   Labelled for what it is and not for what it does. Calling it "Open in
+   OM7Player" would be a promise this page cannot keep - a tap still goes
+   through the browser's own download, and on iOS that lands in the
+   browser's container whatever the file is. Reaching the app from there is
+   the share sheet, or the universal link. Same wording as the artist-site
+   template in the OM7 repo, deliberately: the two pages read the same
+   manifest and should not disagree about the same release.
+  */
+  const bundleDownload = free && bundle && bundle !== download ? bundle : null
   const buyLabel =
     release.price != null && release.buyUrl
       ? `Buy — $${(release.price / 100).toFixed(2)}`
@@ -235,6 +259,22 @@ function ManifestRelease({
               <path d="M5 21h14" />
             </svg>
             Download
+          </a>
+        )}
+
+        {bundleDownload && (
+          <a
+            href={bundleDownload.url}
+            download
+            aria-label={`Download the OM7 release bundle for ${release.title}`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+              <path d="M3 8v8l9 5 9-5V8" />
+              <path d="M12 13v8" />
+            </svg>
+            Release bundle
           </a>
         )}
 
