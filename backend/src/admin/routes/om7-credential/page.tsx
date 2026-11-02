@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Badge, Button, Container, Heading, Text } from "@medusajs/ui"
+import { copyText } from "./copy-text"
 
 declare const __BACKEND_URL__: string
 declare const __AUTH_TYPE__: "session" | "jwt"
@@ -24,27 +25,36 @@ const getAuthHeaders = (): Record<string, string> => {
 }
 
 const Copyable = ({ label, value }: { label: string; value: string }) => {
-  const [copied, setCopied] = useState(false)
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle")
   return (
-    <div className="flex items-center gap-2">
-      <code className="flex-1 break-all rounded bg-ui-bg-subtle px-2 py-1 text-xs">
-        {value}
-      </code>
-      <Button
-        size="small"
-        variant="secondary"
-        onClick={() => {
-          navigator.clipboard.writeText(value).then(
-            () => {
-              setCopied(true)
-              window.setTimeout(() => setCopied(false), 1500)
-            },
-            () => setCopied(false),
-          )
-        }}
-      >
-        {copied ? "Copied" : `Copy ${label}`}
-      </Button>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <code className="flex-1 break-all rounded bg-ui-bg-subtle px-2 py-1 text-xs">
+          {value}
+        </code>
+        <Button
+          size="small"
+          variant="secondary"
+          onClick={() => {
+            // Synchronous on purpose — see copy-text.ts. Awaiting anything
+            // here spends the click's user activation and the copy is refused.
+            const ok = copyText(value)
+            setState(ok ? "copied" : "failed")
+            // A failure stays up: the artist has to know to select it by hand.
+            if (ok) {
+              window.setTimeout(() => setState("idle"), 1500)
+            }
+          }}
+        >
+          {state === "copied" ? "Copied" : `Copy ${label}`}
+        </Button>
+      </div>
+      {state === "failed" && (
+        <Text size="small" className="text-ui-fg-error">
+          This browser refused the copy. Select the {label} above and copy it
+          by hand.
+        </Text>
+      )}
     </div>
   )
 }
