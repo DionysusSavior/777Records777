@@ -49,6 +49,13 @@ export type BeginUploadInput = {
    * service requires it, and the grant — not this string — chooses the prefix.
    */
   destinationId?: unknown
+  /**
+   * Groups several uploads into one release. Validated as a UUID in `begin`
+   * and carried inside the signed receipt, never read back off the completion
+   * body. Declared here because every field on this type is caller-supplied
+   * and therefore `unknown`; omitting it is what broke the build.
+   */
+  releaseId?: unknown
   section?: unknown
   title?: unknown
 }
