@@ -54,7 +54,7 @@ export default function StudioAdmin({
   const [destinationId, setDestinationId] = useState(destinations[0].id)
   const [email, setEmail] = useState("")
   const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState<"connection" | "link" | null>(null)
+  const [copied, setCopied] = useState<{ target: "connection" | "link"; ok: boolean } | null>(null)
   const sections = sectionsFor(config, state)
 
   useEffect(() => {
@@ -180,12 +180,16 @@ export default function StudioAdmin({
             type="button"
             className={quiet}
             onClick={() => {
-              const copiedOk = copyText(state.connection?.value ?? "")
-              setCopied(copiedOk ? "connection" : null)
+              setCopied({ target: "connection", ok: copyText(state.connection?.value ?? "") })
             }}
           >
-            {copied === "connection" ? "Copied" : "Copy"}
+            {copied?.target === "connection" && copied.ok ? "Copied" : "Copy"}
           </button>
+          {copied?.target === "connection" && !copied.ok && (
+            <p className="text-sm text-white/80">
+              The copy did not go through. Select the text above and copy it by hand.
+            </p>
+          )}
           <button type="button" className="w-fit text-xs uppercase tracking-[0.14em] text-white/70" onClick={() => dispatch({ type: "connection-dismissed" })}>
             Dismiss
           </button>
@@ -257,12 +261,16 @@ export default function StudioAdmin({
                 type="button"
                 className={quiet}
                 onClick={() => {
-                  const copiedOk = copyText(state.created?.acceptUrl ?? "")
-                  setCopied(copiedOk ? "link" : null)
+                  setCopied({ target: "link", ok: copyText(state.created?.acceptUrl ?? "") })
                 }}
               >
-                {copied === "link" ? "Copied" : "Copy link"}
+                {copied?.target === "link" && copied.ok ? "Copied" : "Copy link"}
               </button>
+              {copied?.target === "link" && !copied.ok && (
+                <p className="text-white/80">
+                  The copy did not go through. Select the link above and copy it by hand.
+                </p>
+              )}
             </div>
           )}
           <h2 className="text-lg font-bold">Access</h2>
