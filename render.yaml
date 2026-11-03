@@ -1,3 +1,17 @@
+# NOT IN EFFECT. The live service is configured in the Render dashboard, and it
+# disagrees with this file in three places: dashboard rootDir is `backend` where
+# this says `.`, the build command is `npm install && npx medusa build` where
+# this says `npm run build:backend`, and the health check path is EMPTY where
+# this says /health. Checked against Render's API on 3 November 2026.
+#
+# So do not read the list below as what is set, and above all do not read
+# `healthCheckPath: /health` as meaning a health check is configured - there
+# was none for the week the service served stale code, which is exactly how
+# that went unnoticed. Change either of those in the dashboard, or apply this
+# file as a Blueprint deliberately and accept that it also resets rootDir and
+# the build command.
+#
+# `sync: false` means the value lives in the dashboard and is not in this repo.
 services:
   - type: web
     name: medusa-backend
