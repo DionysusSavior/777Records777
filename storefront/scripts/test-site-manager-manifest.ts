@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import {
   parseSiteManagerManifest,
   shelfEntriesFrom,
-} from "../src/lib/site-manager-manifest"
+} from "../src/lib/site-manager-manifest.ts"
 
 const manifestUrl = "https://artist-bucket.example/site-manager/dion/index.json"
 const validItem = {

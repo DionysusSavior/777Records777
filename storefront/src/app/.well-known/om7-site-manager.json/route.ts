@@ -1,16 +1,27 @@
 import { NextResponse } from "next/server"
+import { resolveSiteManagerEndpoint } from "@lib/site-manager-discovery"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
-  const backend = process.env.MEDUSA_BACKEND_URL
-    ?? process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-    ?? "http://localhost:9000"
-  const backendUrl = new URL(backend)
-  if (process.env.NODE_ENV === "production" && backendUrl.protocol !== "https:") {
+  /**
+   * The endpoint is resolved rather than derived here. It was derived from
+   * MEDUSA_BACKEND_URL, which meant publishing could not move off the shop's
+   * host without taking the shop with it - see site-manager-discovery.ts for
+   * why that mattered on 4 November. OM7_SITE_MANAGER_ENDPOINT now overrides.
+   *
+   * A malformed value answers 503 instead of throwing. The old code called
+   * `new URL()` outside any guard, so a typo in the variable surfaced as a 500
+   * from a route whose entire job is to say what IS configured. "Not
+   * configured" is the truthful answer and the one a client can act on.
+   */
+  const resolved = resolveSiteManagerEndpoint(process.env, {
+    requireHttps: process.env.NODE_ENV === "production",
+  })
+  if (!resolved.ok) {
     return NextResponse.json({ error: "Site Manager is not configured." }, { status: 503 })
   }
-  const endpoint = new URL("/om7/site-manager/v1", backendUrl).toString().replace(/\/$/, "")
+  const endpoint = resolved.endpoint
 
   /**
    * Where an artist gets the credential, named rather than assumed.

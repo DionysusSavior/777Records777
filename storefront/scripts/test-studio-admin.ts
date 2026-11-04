@@ -20,7 +20,7 @@ import {
   type PageAction,
   type PageState,
   type SessionStore,
-} from "../src/app/studio-admin/studio-admin-logic"
+} from "../src/app/studio-admin/studio-admin-logic.ts"
 
 let failed = 0
 const check = (label: string, ok: boolean) => {
