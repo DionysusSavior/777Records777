@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
 import { resolveSiteManagerEndpoint } from "../src/lib/site-manager-discovery.ts"
 
@@ -154,6 +155,44 @@ check("the cutover value produces the four routes the client calls", () => {
   assert.equal(new URL("uploads/complete", base).toString(), "https://publish.777records777.studio/uploads/complete")
   assert.equal(new URL("catalogue", base).toString(), "https://publish.777records777.studio/catalogue")
   assert.equal(new URL("catalogue/remove", base).toString(), "https://publish.777records777.studio/catalogue/remove")
+})
+
+/**
+ * A source assertion, not a behaviour one, because no test of this pure
+ * function could have caught the bug it guards.
+ *
+ * The resolver was correct and its 13 checks passed while production answered
+ * 503. The fault was the CALL: `resolveSiteManagerEndpoint(process.env, ...)`
+ * hands Next an object it cannot statically analyse, so the literal
+ * `process.env.FOO` substitutions never happen and the SSR Lambda reads its own
+ * environment - which on Amplify does not carry console variables. Direct
+ * member access at the call site is what makes the values exist at all, so
+ * that is the thing worth asserting.
+ */
+check("the route names each variable directly instead of passing process.env", () => {
+  const source = readFileSync(
+    new URL("../src/app/.well-known/om7-site-manager.json/route.ts", import.meta.url),
+    "utf8"
+  )
+  // Comments are stripped first. The comment explaining this bug quotes the
+  // broken call verbatim, which tripped this very assertion on the first run.
+  const code = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+  assert.ok(
+    !/resolveSiteManagerEndpoint\(\s*process\.env\b/.test(code),
+    "route.ts passes process.env wholesale, which defeats Next's build-time inlining"
+  )
+  for (const name of [
+    "OM7_SITE_MANAGER_ENDPOINT",
+    "MEDUSA_BACKEND_URL",
+    "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
+  ]) {
+    assert.ok(
+      code.includes(`process.env.${name}`),
+      `route.ts must read process.env.${name} by direct member access`
+    )
+  }
 })
 
 console.log(`Site Manager endpoint resolution: ${checks} checks passed`)

@@ -15,9 +15,27 @@ export async function GET(request: Request) {
    * from a route whose entire job is to say what IS configured. "Not
    * configured" is the truthful answer and the one a client can act on.
    */
-  const resolved = resolveSiteManagerEndpoint(process.env, {
-    requireHttps: process.env.NODE_ENV === "production",
-  })
+  /**
+   * Each variable is named by DIRECT member access, deliberately, and this
+   * must not be collapsed back into passing `process.env` itself.
+   *
+   * Next replaces a literal `process.env.FOO` with its build-time value; it
+   * cannot do that for an object passed wholesale, so `resolveSiteManagerEndpoint(process.env, ...)`
+   * reads the running Lambda's environment instead. Amplify console variables
+   * reach the BUILD, not the SSR runtime, so every read came back undefined,
+   * the localhost fallback took over, and requireHttps turned it into a 503 on
+   * a correctly configured site. That shipped on 5 November and took discovery
+   * down for the length of one build. The old code only worked because it read
+   * the variables inline.
+   */
+  const resolved = resolveSiteManagerEndpoint(
+    {
+      OM7_SITE_MANAGER_ENDPOINT: process.env.OM7_SITE_MANAGER_ENDPOINT,
+      MEDUSA_BACKEND_URL: process.env.MEDUSA_BACKEND_URL,
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL,
+    },
+    { requireHttps: process.env.NODE_ENV === "production" }
+  )
   if (!resolved.ok) {
     return NextResponse.json({ error: "Site Manager is not configured." }, { status: 503 })
   }
