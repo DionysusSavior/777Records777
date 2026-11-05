@@ -195,4 +195,25 @@ check("the route names each variable directly instead of passing process.env", (
   }
 })
 
+/**
+ * The guard for the failure that actually happened.
+ *
+ * Naming the variable directly at the call site is necessary and NOT
+ * sufficient. On Amplify a server-side variable that is not listed in
+ * next.config.js's `env` block is undefined at request time whatever scope it
+ * is set in - branch and app were both tried on 5 Nov and both read empty.
+ * Deleting the entry here would not fail a single behavioural test: discovery
+ * would quietly fall through to the backend branch and name the wrong host,
+ * which is exactly what it did for three builds.
+ */
+check("next.config.js declares OM7_SITE_MANAGER_ENDPOINT for build-time inlining", () => {
+  const config = readFileSync(new URL("../next.config.js", import.meta.url), "utf8")
+  const envBlock = config.match(/env:\s*\{[\s\S]*?\n  \}/)
+  assert.ok(envBlock, "next.config.js has no env block")
+  assert.ok(
+    /OM7_SITE_MANAGER_ENDPOINT:\s*process\.env\.OM7_SITE_MANAGER_ENDPOINT/.test(envBlock[0]),
+    "OM7_SITE_MANAGER_ENDPOINT is not inlined in next.config.js's env block, so it is undefined at request time on Amplify"
+  )
+})
+
 console.log(`Site Manager endpoint resolution: ${checks} checks passed`)

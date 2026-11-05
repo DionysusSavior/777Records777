@@ -27,6 +27,14 @@ export async function GET(request: Request) {
    * a correctly configured site. That shipped on 5 November and took discovery
    * down for the length of one build. The old code only worked because it read
    * the variables inline.
+   *
+   * Necessary, and NOT sufficient: naming a variable here only inlines it if
+   * Next is told to inline it. A bare name is not, whatever scope it is set in
+   * on Amplify, so OM7_SITE_MANAGER_ENDPOINT is declared in next.config.js's
+   * `env` block and discovery named the wrong host for three builds before it
+   * was. NEXT_PUBLIC_MEDUSA_BACKEND_URL below needs no such entry - its prefix
+   * is what gets it inlined, and it was quietly supplying the old endpoint the
+   * whole time.
    */
   const resolved = resolveSiteManagerEndpoint(
     {

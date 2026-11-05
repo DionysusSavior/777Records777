@@ -28,6 +28,20 @@ const nextConfig = {
    */
   env: {
     FEATURE_REQUEST_URL: process.env.FEATURE_REQUEST_URL,
+    /**
+     * Same reason as FEATURE_REQUEST_URL above, and it cost a cutover to
+     * relearn on 5 November. Discovery named Render through three builds while
+     * OM7_SITE_MANAGER_ENDPOINT was set correctly on Amplify - first
+     * branch-level, then app-level - because neither scope reaches the SSR
+     * runtime and a bare name is not inlined either. What was actually being
+     * read was NEXT_PUBLIC_MEDUSA_BACKEND_URL, the resolver's second choice,
+     * which resolves only because its prefix gets it inlined.
+     *
+     * So the rule on this deployment: a server-side variable is either listed
+     * HERE or it does not exist. Server-only, like the one above - the sole
+     * reader is the .well-known route handler.
+     */
+    OM7_SITE_MANAGER_ENDPOINT: process.env.OM7_SITE_MANAGER_ENDPOINT,
   },
   reactStrictMode: true,
   logging: {
