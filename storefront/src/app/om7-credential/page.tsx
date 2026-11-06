@@ -19,28 +19,27 @@ export const dynamic = "force-dynamic"
  * anywhere would be a way to borrow an artist's trust for somebody else's
  * page, which is the shape of every credential-phishing link ever sent.
  *
- * The admin that actually issues the credential lives on the backend host
- * (Render here, and some other platform for somebody else), which is NOT the
- * proved domain. So the proved domain vouches for the onward link instead:
- * OM7 sends the artist here, and this page — served from the domain they
- * proved — names where the admin is. The security property survives and the
- * artist still gets one tap from the app to the right screen.
+ * When this page was written the admin that issued credentials lived on the
+ * backend host, which is NOT the proved domain, so the proved domain vouched
+ * for the onward link instead. That indirection is no longer load-bearing:
+ * since 5 November the studio admin is served from this domain at `/admin`,
+ * and discovery names it directly. Check the live document rather than this
+ * comment:
+ *
+ *   curl -s https://777records777.studio/.well-known/om7-site-manager.json
+ *
+ * So the page is now a plain signpost to a destination on its own origin, kept
+ * because the URL is stable and public and because the indirection is needed
+ * again the moment the admin moves off this domain. Making it a redirect to
+ * `/admin` would be the obvious simplification; that is a behaviour change
+ * rather than a correction, so it is Dion's call.
  *
  * Deliberately public and deliberately empty of secrets. It issues nothing and
- * knows nothing; it is a signpost. Not indexed, because it is for one artist
- * rather than for search.
+ * knows nothing, and it reads no environment: a signpost that depends on
+ * configuration is a signpost that can point at nothing. Not indexed, because
+ * it is for one artist rather than for search.
  */
 export default function Om7CredentialPage() {
-  const backend =
-    process.env.MEDUSA_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ??
-    ""
-  // Medusa serves its admin at /app. Absent configuration this stays null and
-  // the page says where to look rather than printing a broken link.
-  const adminUrl = backend
-    ? new URL("/app/om7-credential", backend).toString()
-    : null
-
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6 py-16">
       <div className="flex flex-col gap-2">
@@ -56,41 +55,15 @@ export default function Om7CredentialPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider opacity-60">
           Where to get it
         </h2>
-        {adminUrl ? (
-          <>
-            <p className="text-sm leading-relaxed opacity-70">
-              Sign in to this site&rsquo;s admin and open{" "}
-              <strong>OM7 publishing</strong>. One button issues a credential
-              and shows it once.
-            </p>
-            <a
-              href={adminUrl}
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-            >
-              Open the site admin
-            </a>
-          </>
-        ) : (
-          <p className="text-sm leading-relaxed opacity-70">
-            Sign in to this site&rsquo;s admin and open{" "}
-            <strong>OM7 publishing</strong>.
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-lg border border-white/15 p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider opacity-60">
-          Studio admin
-        </h2>
         <p className="text-sm leading-relaxed opacity-70">
-          Granting an artist their own page is a different login, on this
-          site, at studio admin. It does not replace the button above until
-          the publishing service itself moves. Render is still the live
-          publisher.
+          Sign in to studio admin on this site. If somebody invited you to a
+          page, open the link they sent and sign in with the email it was sent
+          to; the connection string is shown there once. If a page is already
+          yours, it is under <strong>Your connections</strong>.
         </p>
         <a
           href="/admin"
-          className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/10"
+          className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
         >
           Open studio admin
         </a>
@@ -99,7 +72,7 @@ export default function Om7CredentialPage() {
       <p className="text-xs leading-relaxed opacity-50">
         The credential is shown once and is never stored by this site — only a
         fingerprint of it is kept, which cannot be used to publish. If it is
-        lost, issue a new one; doing so stops the old one working.
+        lost, renew the connection; doing so stops the old one working.
       </p>
     </main>
   )
