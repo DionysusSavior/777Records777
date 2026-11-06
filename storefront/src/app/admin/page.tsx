@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic"
 /**
  * The administrator Dion logs into on the studio site.
  *
- * Not Medusa's /app. The publishing service this page talks to is not the
- * live one until he approves the cutover, and this page does not guess a
- * service URL when none is configured.
+ * Not Medusa's /app, which now lives at shop.777records777.studio/app. The
+ * publishing service this page talks to went live on 5 November, so the
+ * cutover this comment used to be waiting for has happened. The page still
+ * does not guess a service URL when none is configured.
  */
 export default function StudioAdminPage() {
   return (
