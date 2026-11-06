@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import assert from "node:assert/strict"
 import { resolveSiteManagerEndpoint } from "../src/lib/site-manager-discovery.ts"
 
@@ -213,6 +213,69 @@ check("next.config.js declares OM7_SITE_MANAGER_ENDPOINT for build-time inlining
   assert.ok(
     /OM7_SITE_MANAGER_ENDPOINT:\s*process\.env\.OM7_SITE_MANAGER_ENDPOINT/.test(envBlock[0]),
     "OM7_SITE_MANAGER_ENDPOINT is not inlined in next.config.js's env block, so it is undefined at request time on Amplify"
+  )
+})
+
+/**
+ * The same guard for the commerce backend, which is the variable the whole
+ * shop reads.
+ *
+ * Three files used to carry `https://seven77records777.onrender.com` as a
+ * hardcoded fallback, so MEDUSA_BACKEND_URL being undefined at request time
+ * was invisible: the shop kept working, against Render, whatever the variable
+ * said. Those fallbacks are gone, which makes this entry the only thing
+ * carrying the value into a running server.
+ */
+check("next.config.js declares MEDUSA_BACKEND_URL for build-time inlining", () => {
+  const config = readFileSync(new URL("../next.config.js", import.meta.url), "utf8")
+  const envBlock = config.match(/env:\s*\{[\s\S]*?\n  \}/)
+  assert.ok(envBlock, "next.config.js has no env block")
+  assert.ok(
+    /MEDUSA_BACKEND_URL:\s*process\.env\.MEDUSA_BACKEND_URL/.test(envBlock[0]),
+    "MEDUSA_BACKEND_URL is not inlined in next.config.js's env block, so it is undefined at request time on Amplify and src/lib/config.ts falls back to localhost"
+  )
+})
+
+/**
+ * Nothing under src/ may name a Render host.
+ *
+ * Commerce is the last thing OM7 ran there. A hardcoded host is not a
+ * fallback, it is a second configuration that no variable can override and
+ * nothing reports - which is how discovery named a dead endpoint for a week
+ * in November. Once the address stops being OM7's, anything still pointing at
+ * it is reaching a host somebody else may come to own.
+ *
+ * Scoped to src/: the fixtures above use the old host deliberately, as an
+ * arbitrary origin for checking that the resolver appends a path.
+ */
+check("no Render host is hardcoded under src/", () => {
+  const root = new URL("../src/", import.meta.url)
+  const offenders: string[] = []
+  const walk = (dir: URL) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const child = new URL(entry.name + (entry.isDirectory() ? "/" : ""), dir)
+      if (entry.isDirectory()) {
+        walk(child)
+      } else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name)) {
+        // Comments stripped first, and for the same reason the guard above
+        // strips them: the comments explaining why these fallbacks were
+        // removed name the host they removed, and this assertion caught them
+        // on its first run. `[^:]` before the slashes so a URL in code is not
+        // read as a comment.
+        const code = readFileSync(child, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/(^|[^:])\/\/.*$/gm, "$1")
+        if (code.includes("onrender.com")) {
+          offenders.push(child.pathname.slice(root.pathname.length))
+        }
+      }
+    }
+  }
+  walk(root)
+  assert.deepEqual(
+    offenders,
+    [],
+    `a Render host is hardcoded in: ${offenders.join(", ")}`
   )
 })
 

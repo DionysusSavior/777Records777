@@ -42,6 +42,24 @@ const nextConfig = {
      * reader is the .well-known route handler.
      */
     OM7_SITE_MANAGER_ENDPOINT: process.env.OM7_SITE_MANAGER_ENDPOINT,
+    /**
+     * The commerce backend, by the rule the two entries above arrived at.
+     *
+     * Until this line existed, `process.env.MEDUSA_BACKEND_URL` was undefined
+     * at request time and what actually answered was
+     * NEXT_PUBLIC_MEDUSA_BACKEND_URL, or - where that was missing too - a
+     * hardcoded Render host compiled into three separate files. Those
+     * fallbacks are gone, so this variable is now load-bearing: without it,
+     * src/lib/config.ts points the SDK at localhost and every call fails in
+     * the log instead of quietly reaching a host OM7 does not own.
+     *
+     * Adding it changes which variable wins - this one, over the
+     * NEXT_PUBLIC_ copy. BOTH must therefore name the same backend on
+     * Amplify, or the browser and the server disagree about where the shop
+     * is. Server-only readers: src/lib/config.ts, src/middleware.ts and
+     * src/app/api/variant-availability/route.ts.
+     */
+    MEDUSA_BACKEND_URL: process.env.MEDUSA_BACKEND_URL,
   },
   reactStrictMode: true,
   logging: {

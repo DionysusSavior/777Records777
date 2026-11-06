@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
+// No hardcoded host; see src/lib/config.ts. Unset is answered below rather
+// than by `new URL()` throwing a 500 out of a route whose job is to report
+// what a variant's availability is.
 const MEDUSA_BACKEND_URL =
-  process.env.MEDUSA_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
-  "https://seven77records777.onrender.com"
+  process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 
 const ADMIN_API_TOKEN =
   process.env.MEDUSA_ADMIN_API_TOKEN ||
@@ -17,6 +18,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { error: "variantId is required" },
       { status: 400 }
+    )
+  }
+
+  if (!MEDUSA_BACKEND_URL) {
+    console.error(
+      "variant-availability: MEDUSA_BACKEND_URL is not set. It reaches the server only if next.config.js declares it."
+    )
+    return NextResponse.json(
+      { error: "Availability is unavailable." },
+      { status: 503 }
     )
   }
 

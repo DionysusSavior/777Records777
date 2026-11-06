@@ -1,0 +1,12 @@
+# node_modules is reinstalled in the image; copying the host's would both
+# bloat the build context and risk carrying darwin-arm64 native builds into a
+# linux image.
+node_modules
+.medusa
+dist
+*.log
+.env
+.env.*
+integration-tests
+**/__tests__
+.DS_Store

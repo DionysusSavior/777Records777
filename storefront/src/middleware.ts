@@ -1,10 +1,15 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
+/**
+ * No hardcoded host. Undefined is a state this file already handles: a falsy
+ * backendUrl makes getRegionMap throw, middleware() catches it, and every page
+ * serves on DEFAULT_REGION - the same degradation an unreachable backend gets.
+ * See the comment on that catch. A Render address compiled in here would have
+ * outlived Render.
+ */
 const backendUrl =
-  process.env.MEDUSA_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
-  "https://seven77records777.onrender.com"
+  process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 
 const publishableKey =
   process.env.MEDUSA_PUBLISHABLE_KEY ||
