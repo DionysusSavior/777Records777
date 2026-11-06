@@ -31,17 +31,40 @@ before building the Next.js storefront. Set these Amplify env vars:
 - `NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://<your-backend-domain>`
 - `NEXT_PUBLIC_BASE_URL=https://<storefront-domain>`
 
-## Render deployment (backend)
-- In Render, create managed Postgres (grab `DATABASE_URL`) and managed Redis (grab `REDIS_URL`).
-- Add a new Web Service from this repo and let it pick up `render.yaml`.
-  - Build: `npm install && npm run build:backend`
-  - Start: `npm --workspace backend run start`
-  - Health check: `/health`
-- Set env vars on the service:
-  - `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `COOKIE_SECRET` (mark secrets as private)
-  - `STORE_CORS=https://777records777.studio`
-  - `ADMIN_CORS=https://777records777.studio/admin,http://localhost:9000/app`
-  - `MEDUSA_BACKEND_URL=https://<your-render-service>.onrender.com`
-- After first deploy, seed data once from the Render shell:
-  - `npm run seed --workspace backend`
+## Backend deployment (AWS)
+
+The backend runs on ECS Fargate at `https://shop.777records777.studio`, with
+Postgres on RDS. **It is not on Render**; commerce moved on 6 November 2026 and
+`render.yaml` was deleted so that nobody can recreate the old service by
+applying it as a Blueprint.
+
+Infrastructure is one CDK stack in the sibling `music-metaverse` repository —
+`infra/cdk/lib/commerce-stack.ts`, deployed by `bin/commerce.ts` rather than by
+the default app, so a routine `cdk deploy` cannot touch the shop's database:
+
+```
+cd ../music-metaverse/infra/cdk
+npx cdk -a "npx ts-node --prefer-ts-exts bin/commerce.ts" deploy
+```
+
+The container image is built in CodeBuild from a zip of `backend/`, not from a
+local Dockerfile asset — see `infra/cdk/scripts/commerce-image.sh`. There is no
+Docker on the machine this was set up from, and an image only one laptop can
+rebuild is an image nobody else can.
+
+What the stack supplies, so you do not set it by hand:
+- `DATABASE_URL` is assembled by `backend/docker-entrypoint.sh` from values ECS
+  injects from the RDS secret. TLS is required and verified against the RDS CA
+  bundle baked into the image.
+- `JWT_SECRET` and `COOKIE_SECRET` are generated into Secrets Manager.
+- `STORE_CORS`, `ADMIN_CORS`, `AUTH_CORS` and `MEDUSA_BACKEND_URL` are set in
+  the task definition.
+- S3 access and `ses:SendEmail` come from the task role. **No static access
+  keys and no Resend key** — preorder mail goes through SES.
+- There is no Redis. Medusa v2 uses `redisUrl` for session storage alone, and
+  one task does not need it.
+
+Migrations run in the container entrypoint on every start, so a deploy is the
+migration.
+
 - In Medusa Admin → Settings → API Keys, create a **Publishable** key and paste it into Amplify as `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` so the storefront build succeeds.
