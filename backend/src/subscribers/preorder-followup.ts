@@ -1,9 +1,34 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { Modules } from "@medusajs/framework/utils"
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2"
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY
-const PREORDER_FROM_EMAIL = process.env.PREORDER_FROM_EMAIL
-const PREORDER_SUPPORT_EMAIL = "support@777records777.studio"
+/**
+ * Sends through SES, not Resend.
+ *
+ * Resend was never needed here. SES already has 777records777.studio as a
+ * verified domain identity with DKIM and its own MAIL FROM, the account has
+ * production access rather than sandbox, and MailStack's FeatureRequestFn has
+ * been sending through it all along - the storefront's feature-request form
+ * stopped going through Medusa when that Lambda was built. This subscriber was
+ * the last thing in the project still holding a Resend key, which meant a
+ * third-party secret had to survive the move off Render for one email.
+ *
+ * REGION IS NOT THE TASK'S REGION. The identity lives in us-east-1, where
+ * MailStack is pinned because inbound SES receiving only exists in a few
+ * regions; this service runs in us-east-2. Defaulting to the task's region
+ * would fail with a message about an unverified identity, which sends you
+ * looking at DNS rather than at the region.
+ *
+ * No key, no header, no secret: the Fargate task role carries ses:SendEmail,
+ * scoped by a condition on the From address.
+ */
+const PREORDER_FROM_EMAIL =
+  process.env.PREORDER_FROM_EMAIL?.trim() || "noreply@777records777.studio"
+const PREORDER_SUPPORT_EMAIL =
+  process.env.PREORDER_REPLY_TO?.trim() || "support@777records777.studio"
+const SES_REGION = process.env.PREORDER_SES_REGION?.trim() || "us-east-1"
+
+const ses = new SESv2Client({ region: SES_REGION })
 
 const PREORDER_EMAIL_SUBJECT = "Thank you for your preorder"
 const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
@@ -111,41 +136,25 @@ const PREORDER_EMAIL_HTML = `<!DOCTYPE html>
 const hasTruthyFlag = (value: unknown) => value === true || value === "true"
 
 const sendPreorderEmail = async (to: string) => {
-  if (!RESEND_API_KEY || !PREORDER_FROM_EMAIL) {
-    return
-  }
-
-  const payload = {
-    from: PREORDER_FROM_EMAIL,
-    to,
-    subject: PREORDER_EMAIL_SUBJECT,
-    html: PREORDER_EMAIL_HTML,
-    reply_to: PREORDER_SUPPORT_EMAIL,
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    const message = await response.text()
-    throw new Error(`Resend error (${response.status}): ${message}`)
-  }
+  await ses.send(
+    new SendEmailCommand({
+      FromEmailAddress: PREORDER_FROM_EMAIL,
+      Destination: { ToAddresses: [to] },
+      ReplyToAddresses: [PREORDER_SUPPORT_EMAIL],
+      Content: {
+        Simple: {
+          Subject: { Data: PREORDER_EMAIL_SUBJECT, Charset: "UTF-8" },
+          Body: { Html: { Data: PREORDER_EMAIL_HTML, Charset: "UTF-8" } },
+        },
+      },
+    })
+  )
 }
 
 export default async function preorderFollowupHandler({
   event,
   container,
 }: SubscriberArgs<{ id: string }>) {
-  if (!RESEND_API_KEY || !PREORDER_FROM_EMAIL) {
-    return
-  }
-
   const cartId = event?.data?.id
   if (!cartId) {
     return
