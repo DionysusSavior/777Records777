@@ -51,12 +51,22 @@ ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/c
 RUN chmod 0444 /etc/ssl/certs/rds-global-bundle.pem
 
 WORKDIR /app
-COPY --from=build /app/.medusa/server ./
+# --chown, because Medusa writes inside its own node_modules at runtime.
+#
+# Without it the server starts as `node` against a tree owned by root and the
+# migration runner dies with EACCES on
+# mkdir '/app/node_modules/@medusajs/event-bus-local/dist/migrations' - it
+# creates a migrations directory per module on the fly, for the half-dozen
+# modules that ship without one. An earlier version of this file asserted
+# "the server writes nothing under /app at runtime"; that was wrong, and the
+# task crash-looped on 6 November until it was.
+COPY --from=build --chown=node:node /app/.medusa/server ./
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+ && chown node:node /app
 
-# Not root. Nothing in this stage builds anything, and the server writes
-# nothing under /app at runtime.
+# Not root. The application directory is writable by this user because Medusa
+# requires it; nothing outside /app and /tmp is.
 USER node
 
 EXPOSE 9000
