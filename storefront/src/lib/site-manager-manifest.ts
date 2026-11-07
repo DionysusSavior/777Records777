@@ -327,9 +327,15 @@ const refused = (manifestUrl: string, at: string, raw: unknown) => {
   )
 }
 
+/**
+ * `show` is the page: a bad row is dropped and the rest stays up.
+ * `store` is the writer: a bad row refuses the document, so a publish cannot
+ * save a file the page would then hide. Duplicate ids refuse in both modes.
+ */
 export const parseSiteManagerManifest = (
   input: string,
-  manifestUrl: string
+  manifestUrl: string,
+  mode: "show" | "store" = "show",
 ): SiteManagerManifest | null => {
   if (new TextEncoder().encode(input).byteLength > MAX_MANIFEST_BYTES) {
     return refuse(manifestUrl, "size", `${new TextEncoder().encode(input).byteLength} bytes`)
@@ -363,13 +369,17 @@ export const parseSiteManagerManifest = (
   for (let index = 0; index < source.items.length; index += 1) {
     const raw = source.items[index]
     const item = parseItem(raw, expected.origin)
-    if (!item || itemIds.has(item.id)) {
-      // Refusing the document is this parser's documented choice, above. Not
-      // SAYING so was not: the page quietly fell back to its static content
-      // and nothing anywhere recorded which row did it. A content type the
-      // publishing service accepted and this list did not went unnoticed for
-      // weeks that way.
+    if (!item) {
+      // A bad row is dropped on the page. Refusing the document here took the
+      // rest of the shelf down with it, including films. The writer still
+      // refuses, so a publish cannot save a row the page would hide. A
+      // duplicate id is not a bad row: the document contradicts itself.
       refused(manifestUrl, `items[${index}]`, raw)
+      if (mode === "store") return null
+      continue
+    }
+    if (itemIds.has(item.id)) {
+      refused(manifestUrl, `items[${index}] duplicate id`, raw)
       return null
     }
     itemIds.add(item.id)
@@ -394,12 +404,16 @@ export const parseSiteManagerManifest = (
     for (let index = 0; index < source.releases.length; index += 1) {
       const raw = source.releases[index]
       const release = parseRelease(raw, itemsById)
-      if (
-        !release ||
-        releaseIds.has(release.id) ||
-        itemIds.has(release.id)
-      ) {
+      if (!release) {
+        // Same as a bad item. `releases` stays an array, so the shelf does not
+        // fall back to loose files and reveal a hidden one. An id that is also
+        // an item id, or a second release with the same id, still refuses.
         refused(manifestUrl, `releases[${index}]`, raw)
+        if (mode === "store") return null
+        continue
+      }
+      if (releaseIds.has(release.id) || itemIds.has(release.id)) {
+        refused(manifestUrl, `releases[${index}] duplicate id`, raw)
         return null
       }
       for (const id of [release.audio, release.reel, release.artwork, release.bundle]) {
@@ -425,8 +439,13 @@ export const parseSiteManagerManifest = (
     for (let index = 0; index < source.movies.length; index += 1) {
       const raw = source.movies[index]
       const movie = parseMovie(raw, expected.origin)
-      if (!movie || movieIds.has(movie.id) || itemIds.has(movie.id)) {
+      if (!movie) {
         refused(manifestUrl, `movies[${index}]`, raw)
+        if (mode === "store") return null
+        continue
+      }
+      if (movieIds.has(movie.id) || itemIds.has(movie.id)) {
+        refused(manifestUrl, `movies[${index}] duplicate id`, raw)
         return null
       }
       movieIds.add(movie.id)

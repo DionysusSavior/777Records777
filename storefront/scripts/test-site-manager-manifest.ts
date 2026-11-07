@@ -97,19 +97,19 @@ check("unknown protocol or version is refused", () => {
   assert.equal(parseSiteManagerManifest(manifest({ protocol: "some-other-list" }), manifestUrl), null)
 })
 
-check("http, foreign origin, kind/type mismatch, bad extension, duplicate ids refused", () => {
-  assert.equal(parseSiteManagerManifest(manifest({
-    items: [{ ...validItem, url: "http://artist-bucket.example/file.wav" }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
-    items: [{ ...validItem, url: "https://tracker.example/file.wav" }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
-    items: [{ ...validItem, kind: "video" }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
-    items: [{ ...validItem, url: "https://artist-bucket.example/file.svg" }],
-  }), manifestUrl), null)
+check("a bad item is dropped, and a duplicate id still refuses the page", () => {
+  for (const bad of [
+    { ...validItem, url: "http://artist-bucket.example/file.wav" },
+    { ...validItem, url: "https://tracker.example/file.wav" },
+    { ...validItem, kind: "video" },
+    { ...validItem, url: "https://artist-bucket.example/file.svg" },
+  ]) {
+    const parsed = parseSiteManagerManifest(manifest({
+      items: [reelItem, bad],
+    }), manifestUrl)
+    assert(parsed)
+    assert.deepEqual(parsed.items.map((item) => item.id), [reelItem.id])
+  }
   assert.equal(parseSiteManagerManifest(manifest({
     items: [validItem, validItem],
   }), manifestUrl), null)
@@ -147,35 +147,29 @@ check("hidden stays in the model so the shelf can honour visible: false", () => 
   assert.equal(parsed?.releases?.[0].visible, false)
 })
 
-check("price 0, missing price, missing visible, dangling id, wrong role kind all refuse", () => {
+check("a bad release is dropped and the one beside it stays", () => {
   const base = {
     items: [validItem, reelItem, artItem, bundleItem],
   }
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...validRelease, price: 0 }],
-  }), manifestUrl), null)
-  const { price: _price, ...noPrice } = validRelease
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [noPrice],
-  }), manifestUrl), null)
-  const { visible: _visible, ...noVisible } = validRelease
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [noVisible],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...validRelease, audio: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...validRelease, audio: reelItem.id, reel: null, artwork: null, bundle: null }],
-  }), manifestUrl), null)
+  const good = { ...pricedRelease }
+  const cases = [
+    { ...validRelease, price: 0 },
+    (({ price: _price, ...rest }) => rest)(validRelease),
+    (({ visible: _visible, ...rest }) => rest)(validRelease),
+    { ...validRelease, audio: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" },
+    { ...validRelease, audio: reelItem.id, reel: null, artwork: null, bundle: null },
+  ]
+  for (const bad of cases) {
+    const parsed = parseSiteManagerManifest(manifest({
+      ...base,
+      releases: [bad, good],
+    }), manifestUrl)
+    assert(parsed)
+    assert.deepEqual(parsed.releases?.map((release) => release.id), [good.id])
+  }
 })
 
-check("one item on two releases, a release with no files, svg-as-image, html-as-bundle refused", () => {
+check("one item on two releases still refuses; an empty release and a bad file are dropped", () => {
   assert.equal(parseSiteManagerManifest(manifest({
     items: [validItem],
     releases: [
@@ -183,23 +177,29 @@ check("one item on two releases, a release with no files, svg-as-image, html-as-
       { ...validRelease, id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff", reel: null, artwork: null, bundle: null },
     ],
   }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
+  const emptyRelease = parseSiteManagerManifest(manifest({
     items: [validItem],
     releases: [{ ...validRelease, audio: null, reel: null, artwork: null, bundle: null }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
+  }), manifestUrl)
+  assert(emptyRelease)
+  assert.equal(emptyRelease.releases?.length, 0)
+  const svg = parseSiteManagerManifest(manifest({
     items: [{
       ...artItem,
       contentType: "image/svg+xml",
       url: "https://artist-bucket.example/site-manager/dion/c4d2e3f5-6071-490b-bccd-def012345678.svg",
-    }],
-  }), manifestUrl), null)
-  assert.equal(parseSiteManagerManifest(manifest({
+    }, validItem],
+  }), manifestUrl)
+  assert(svg)
+  assert.deepEqual(svg.items.map((item) => item.id), [validItem.id])
+  const html = parseSiteManagerManifest(manifest({
     items: [{
       ...bundleItem,
       url: "https://artist-bucket.example/site-manager/dion/d5e3f406-7182-4a0c-bcde-f0123456789a.html",
     }],
-  }), manifestUrl), null)
+  }), manifestUrl)
+  assert(html)
+  assert.equal(html.items.length, 0)
 })
 
 check("a priced release keeps its price and its buy link together", () => {
@@ -212,30 +212,26 @@ check("a priced release keeps its price and its buy link together", () => {
   assert.equal(parsed.releases?.[0].buyUrl, "https://buy.stripe.com/test_abc123")
 })
 
-check("price without buyUrl, buyUrl without price, http buyUrl, missing buyUrl key all refuse", () => {
+check("a release with a broken price is dropped, and the writer still refuses it", () => {
   const base = { items: [validItem, reelItem, artItem, bundleItem] }
-  // A price with nothing to pay it at.
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...validRelease, price: 999 }],
-  }), manifestUrl), null)
-  // A link with no stated price.
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...validRelease, buyUrl: "https://buy.stripe.com/test_abc123" }],
-  }), manifestUrl), null)
-  // Plain http is not an acceptable checkout link.
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [{ ...pricedRelease, buyUrl: "http://buy.stripe.com/test_abc123" }],
-  }), manifestUrl), null)
-  // Same all-or-nothing rule as "price" above: the key must be present, even
-  // when the value would be null.
-  const { buyUrl: _buyUrl, ...noBuyUrl } = pricedRelease
-  assert.equal(parseSiteManagerManifest(manifest({
-    ...base,
-    releases: [noBuyUrl],
-  }), manifestUrl), null)
+  const broken = [
+    { ...validRelease, price: 999 },
+    { ...validRelease, buyUrl: "https://buy.stripe.com/test_abc123" },
+    { ...pricedRelease, buyUrl: "http://buy.stripe.com/test_abc123" },
+    (({ buyUrl: _buyUrl, ...rest }) => rest)(pricedRelease),
+  ]
+  for (const bad of broken) {
+    const shown = parseSiteManagerManifest(manifest({
+      ...base,
+      releases: [bad, pricedRelease],
+    }), manifestUrl)
+    assert(shown)
+    assert.deepEqual(shown.releases?.map((release) => release.id), [pricedRelease.id])
+    assert.equal(parseSiteManagerManifest(manifest({
+      ...base,
+      releases: [bad],
+    }), manifestUrl, "store"), null)
+  }
 })
 
 check("the shelf hides invisible releases and does not invent them from items", () => {
@@ -272,7 +268,12 @@ check("a movie is a movie, and a missing movies list leaves the sounds alone", (
   const offSite = parseSiteManagerManifest(manifest({
     movies: [{ ...film, url: "https://evil.example/film.mp4" }],
   }), manifestUrl)
-  assert.equal(offSite, null)
+  assert(offSite)
+  assert.equal(offSite.movies?.length, 0)
+  assert.equal(offSite.items.length, 1)
+  assert.equal(parseSiteManagerManifest(manifest({
+    movies: [{ ...film, url: "https://evil.example/film.mp4" }],
+  }), manifestUrl, "store"), null)
 })
 
 console.log(`Site Manager manifest parser: ${checks} checks passed`)

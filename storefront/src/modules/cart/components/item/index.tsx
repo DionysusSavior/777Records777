@@ -50,10 +50,7 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
         <Table.Cell className="!pl-0 p-4 w-24">
           <LocalizedClientLink
             href={`/products/${item.product_handle}`}
-            className={clx("flex", {
-              "w-16": type === "preview",
-              "small:w-24 w-12": type === "full",
-            })}
+            className="flex w-16"
           >
             <Thumbnail
               thumbnail={item.thumbnail}
@@ -105,50 +102,6 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
           </div>
           <ErrorMessage error={error} data-testid="product-error-message" />
         </Table.Cell>
-
-        {type === "full" && (
-          <Table.Cell>
-            <div className="flex gap-2 items-center w-28">
-              <DeleteButton id={item.id} data-testid="product-delete-button" />
-              <CartItemSelect
-                value={item.quantity}
-                onChange={(value) =>
-                  changeQuantity(parseInt(value.target.value))
-                }
-                className="w-14 h-10 p-4"
-                data-testid="product-select-button"
-              >
-                {/* TODO: Update this with the v2 way of managing inventory */}
-                {Array.from(
-                  {
-                    length: Math.min(maxQuantity, 10),
-                  },
-                  (_, i) => (
-                    <option value={i + 1} key={i}>
-                      {i + 1}
-                    </option>
-                  )
-                )}
-
-                <option value={1} key={1}>
-                  1
-                </option>
-              </CartItemSelect>
-              {updating && <Spinner />}
-            </div>
-            <ErrorMessage error={error} data-testid="product-error-message" />
-          </Table.Cell>
-        )}
-
-        {type === "full" && (
-          <Table.Cell className="hidden small:table-cell">
-            <LineItemUnitPrice
-              item={item}
-              style="tight"
-              currencyCode={currencyCode}
-            />
-          </Table.Cell>
-        )}
 
         <Table.Cell className="!pr-0">
           <span

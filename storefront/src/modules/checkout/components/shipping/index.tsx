@@ -21,7 +21,26 @@ type ShippingProps = {
   availableShippingMethods: HttpTypes.StoreCartShippingOption[] | null
 }
 
-function formatAddress(address: HttpTypes.StoreCartAddress) {
+/**
+ * The published shipping-option type no longer names `service_zone`, but the
+ * store API still returns it and this screen reads the pickup flag and the
+ * location address off it. The cast is the field the type dropped, not a
+ * guess at a different object.
+ */
+function shippingZone(option: HttpTypes.StoreCartShippingOption) {
+  return (
+    option as HttpTypes.StoreCartShippingOption & {
+      service_zone?: {
+        fulfillment_set?: {
+          type?: string
+          location?: { address?: HttpTypes.StoreCartAddress | null }
+        }
+      }
+    }
+  ).service_zone
+}
+
+function formatAddress(address?: HttpTypes.StoreCartAddress | null) {
   if (!address) {
     return ""
   }
@@ -71,11 +90,11 @@ const Shipping: React.FC<ShippingProps> = ({
   const isOpen = searchParams.get("step") === "delivery"
 
   const _shippingMethods = availableShippingMethods?.filter(
-    (sm) => sm.service_zone?.fulfillment_set?.type !== "pickup"
+    (sm) => shippingZone(sm)?.fulfillment_set?.type !== "pickup"
   )
 
   const _pickupMethods = availableShippingMethods?.filter(
-    (sm) => sm.service_zone?.fulfillment_set?.type === "pickup"
+    (sm) => shippingZone(sm)?.fulfillment_set?.type === "pickup"
   )
 
   const hasPickupOptions = !!_pickupMethods?.length
@@ -342,7 +361,7 @@ const Shipping: React.FC<ShippingProps> = ({
                               </span>
                               <span className="text-base-regular text-ui-fg-muted">
                                 {formatAddress(
-                                  option.service_zone?.fulfillment_set?.location
+                                  shippingZone(option)?.fulfillment_set?.location
                                     ?.address
                                 )}
                               </span>

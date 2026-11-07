@@ -46,10 +46,17 @@ type ManifestItem = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+/**
+ * The same UUID the website will accept. A looser "36 hex-or-dash characters"
+ * let a key through that `parseSiteManagerManifest` then refused, and that
+ * refusal blanks the whole page. Version nibble 1-8, variant 8/9/a/b.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 const itemId = (key: string) => {
   const file = key.split("/").pop() ?? ""
   const id = file.replace(/\.[^.]+$/, "")
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!UUID.test(id)) {
     throw new CatalogueError(500, "catalogue_key", "The stored object key is not a catalogue id.")
   }
   return id.toLowerCase()
@@ -441,9 +448,9 @@ export type ManifestLocation = {
  * write that would turn a readable page into an unreadable one.
  */
 const refuseUnreadable = (manifest: ManifestLocation, prior: string | null, next: string) => {
-  if (parseSiteManagerManifest(next, manifest.url)) return
+  if (parseSiteManagerManifest(next, manifest.url, "store")) return
   const had = prior !== null && prior.trim() !== ""
-  if (had && !parseSiteManagerManifest(prior, manifest.url)) return
+  if (had && !parseSiteManagerManifest(prior, manifest.url, "store")) return
   throw new CatalogueError(
     500,
     "catalogue_unreadable",

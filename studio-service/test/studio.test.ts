@@ -960,7 +960,7 @@ test("a page the website already refuses is still publishable, not locked", asyn
   const store = manifests()
   await store.write(VIZ_MANIFEST.key, brokenPage("33333333-3333-4333-8333-333333333333"), null)
   const before = store.snapshot(VIZ_MANIFEST.key)
-  assert.equal(parseSiteManagerManifest(before!, VIZ_MANIFEST.url), null, "the fixture is not broken")
+  assert.equal(parseSiteManagerManifest(before!, VIZ_MANIFEST.url, "store"), null, "the fixture is not broken")
 
   await commitCatalogue(store, VIZ_MANIFEST, {
     key: "site-manager/viz/44444444-4444-4444-8444-444444444444.wav",
@@ -1001,7 +1001,7 @@ test("a broken page can be repaired one removal at a time", async () => {
   )
   const halfway = store.snapshot(VIZ_MANIFEST.key)
   assert.equal(JSON.parse(halfway ?? "{}").items.length, 1, "the first removal was refused")
-  assert.equal(parseSiteManagerManifest(halfway!, VIZ_MANIFEST.url), null, "still unreadable, as expected")
+  assert.equal(parseSiteManagerManifest(halfway!, VIZ_MANIFEST.url, "store"), null, "still unreadable, as expected")
 
   await commitRemoval(
     store,

@@ -298,7 +298,8 @@ const canonicalSha256 = (value: unknown) => {
   }
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** Version nibble 1-8 and variant 8/9/a/b, matching the website parser. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const publicUrlFor = (base: string, key: string) => {
   const path = key.split("/").map(encodeURIComponent).join("/")
