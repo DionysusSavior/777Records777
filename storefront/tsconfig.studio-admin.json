@@ -3,7 +3,18 @@
   "compilerOptions": {
     "plugins": [],
     "incremental": false,
-    "noEmit": true
+    "noEmit": true,
+    // The scripts in this config are also run directly by node, which strips
+    // the types and so needs the real specifier - the imports carry `.ts`,
+    // and tsc has to be told that is legal. Safe only because of `noEmit`
+    // above: nothing is emitted from this config, so no `.ts` specifier
+    // survives into anything that runs.
+    //
+    // Without it this command exited non-zero on TS5097 every single time it
+    // was ever run, which is why it could not be a gate. It was not hiding
+    // type errors - the imported module was resolved and checked all along -
+    // it was reporting a fault in the config rather than in the code.
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/app/admin/**/*.tsx",

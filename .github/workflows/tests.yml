@@ -1,0 +1,136 @@
+# The only CI this repository has, and it exists for one fault.
+#
+# The storefront's manifest parser answers null for the WHOLE document over a
+# single unreadable row, and the artist page then falls back to its static
+# content with HTTP 200. So a disagreement between what the service writes and
+# what the website reads does not look like a bad row - it looks like the
+# artist's whole catalogue having been deleted, while every request succeeds.
+# Six content types drifted apart exactly that way and nothing noticed.
+#
+# `every publishable media type survives the website's parser` closes that: it
+# publishes a file of every type the service accepts and hands the manifest to
+# the website's own parser. It is a test ACROSS two packages, so no single
+# package's tooling was ever going to run it - and until this file, nothing
+# did. A test that proves two halves agree is worth nothing unattended.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A superseded run proves nothing about the commit that replaced it.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studio-service:
+    name: studio-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Pinned rather than latest. These .ts files run with no build step
+          # at all, which depends on node's own type stripping; 26 is the
+          # version the suite is verified on.
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: studio-service/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: studio-service
+
+      # studio-service is deliberately not a workspace - it has its own
+      # lockfile and the install above is all of it. But its entrypoint
+      # imports backend/src/site-manager/s3-adapter.ts, and node resolves THAT
+      # file's own imports from the repository root, where a developer
+      # checkout has a workspace install and a fresh checkout has nothing.
+      # Two packages are all that file needs, both of them already in
+      # studio-service's lock, so point the root at those rather than install
+      # Medusa and Next to supply them.
+      #
+      # Caught by running this workflow's steps against a copy of the tracked
+      # files alone: on a developer machine both test files pass, and on a
+      # fresh checkout they cannot even load.
+      - run: ln -s studio-service/node_modules node_modules
+
+      # Imports reach into ../backend and ../storefront, so this needs the
+      # whole checkout and not just this directory.
+      - run: npm test
+        working-directory: studio-service
+
+  # Nothing typechecked studio-service until 7 November 2026: it had no
+  # tsconfig, node strips the types to run the tests and esbuild strips them to
+  # build the Lambda, and neither one checks them. This job is the check, and
+  # it reaches across packages - the storefront's manifest parser and the
+  # backend's site-manager core are in its file set, so breaking the parser's
+  # signature fails here as well as in the tests.
+  studio-service-types:
+    name: studio-service types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: studio-service/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: studio-service
+
+      # Needed here for the same reason as in the test job, and it is easy to
+      # believe a typecheck would not care: tsc resolves `@aws-sdk/*` from the
+      # directory of the file that imports it, and one of those files is
+      # backend/src/site-manager/s3-adapter.ts, which looks for them at the
+      # repository root. Without this the job fails on TS2307, not on types.
+      - run: ln -s studio-service/node_modules node_modules
+
+      # Its own job rather than a step of the test job, so a type error and a
+      # failing test stay two separate answers.
+      - run: npm run typecheck
+        working-directory: studio-service
+
+  # The studio admin page, which is a React surface in the storefront and so
+  # cannot be checked without the storefront's own dependencies. Until today
+  # this command exited non-zero every time it was run, on a single TS5097
+  # about a `.ts` import specifier - a fault in the config, not the code - so
+  # it could never be a gate.
+  storefront-types:
+    name: storefront types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # `npm install` rather than `npm ci`, and not by preference: the
+      # committed root lockfile is out of sync with the root package.json, so
+      # `npm ci` at the root refuses to run at all ("Missing: @aws-sdk/...
+      # from lock file"). Amplify's own preBuild already installs this way, so
+      # this job is no less reproducible than the production build is. If the
+      # root lock is ever regenerated, this becomes `npm ci -w storefront`.
+      #
+      # `--ignore-scripts` because a typecheck needs no postinstall binaries,
+      # and `-w storefront` so this does not drag in Medusa.
+      - run: npm install -w storefront --include=dev --no-audit --no-fund --ignore-scripts
+      - run: npm run typecheck:studio-admin
+        working-directory: storefront
+
+  manifest-parser:
+    name: manifest parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      # Its own job, with no install step, because the parser and its test
+      # import nothing at all. It still reports when the install above breaks.
+      - run: node storefront/scripts/test-site-manager-manifest.ts

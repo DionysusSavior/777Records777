@@ -1,0 +1,75 @@
+{
+  // studio-service had no tsconfig at all, so until 7 November 2026 nothing
+  // ever typechecked it. Node strips the types to run the tests and esbuild
+  // strips them to build the Lambda; neither one CHECKS them. A type error
+  // here shipped silently, and the only reason the last one was caught was a
+  // typecheck somebody ran by hand.
+  //
+  // This config exists to check, and to check the thing that actually runs -
+  // so every option below is pinned to how this service is really built
+  // rather than to a house style.
+  "compilerOptions": {
+    // Lambda NODEJS_24_X, bundled by esbuild with target 'node24'
+    // (music-metaverse: infra/cdk/lib/studio-publish-stack.ts). The tests run
+    // on a newer node than that, so the LOWER bound is the useful one: a
+    // feature node 24 cannot run must fail here, not in production.
+    "target": "es2023",
+    "lib": ["es2023"],
+    // package.json says "type": "module", and every relative import carries
+    // its real `.ts` extension because that is what node needs to resolve it.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    // Nothing is emitted from here, by anything, ever. That is what makes the
+    // `.ts` specifiers legal to typecheck.
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+
+    // The option that makes this config describe reality instead of an ideal.
+    // Both node and esbuild strip these files ONE FILE AT A TIME, with no
+    // knowledge of any other file, so syntax that cannot be erased - enums,
+    // namespaces, constructor parameter properties - throws at runtime while
+    // a plain tsc run accepts it happily. This is the difference between
+    // checking the types and checking the service.
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+
+    // `verbatimModuleSyntax` is DELIBERATELY ABSENT, and this is the one
+    // thing to read before adding it back. It produces 37 errors, every one
+    // of them in `backend/` or `storefront/` and every one of them a lie:
+    //
+    //   ../backend/src/site-manager/core.ts(8,1): error TS1287: A top-level
+    //   'export' modifier cannot be used on value declarations in a CommonJS
+    //   module when 'verbatimModuleSyntax' is enabled.
+    //
+    // Under `nodenext` TypeScript decides a file's module kind from the
+    // nearest package.json alone. Neither backend/ nor storefront/ sets
+    // "type", so tsc calls every `.ts` file in them CommonJS. Node does not
+    // agree, and node is the one running them - it tries CommonJS, fails, and
+    // reparses as ESM on detected syntax, saying so out loud:
+    //
+    //   [MODULE_TYPELESS_PACKAGE_JSON] Module type of .../core.ts is not
+    //   specified and it doesn't parse as CommonJS. Reparsing as ES module
+    //   because module syntax was detected.
+    //
+    // So the gap is in tsc's model, not in the code. The fix node suggests -
+    // "type": "module" in backend/package.json - would break Medusa, and the
+    // same in storefront/ would break Next. Both stay as they are.
+
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    // Consistent with backend and storefront: the dependency types are not
+    // this repository's to fix.
+    "skipLibCheck": true
+  },
+  // The cross-package files arrive on their own, as imports of these: the
+  // backend's site-manager core and the storefront's manifest parser and
+  // artist data are checked here too, for the parts this service uses. That
+  // is the point rather than a side effect - the agreement between the
+  // service and the website is the thing most worth holding, and it has
+  // broken twice.
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

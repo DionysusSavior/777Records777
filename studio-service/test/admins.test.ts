@@ -331,7 +331,7 @@ test("HTTP admin setup and invitations require identity and never grant publishi
     403
   );
   const response = await call(owner, "/people/invite", { email: other.email });
-  const invitation = await response.json();
+  const invitation = (await response.json()) as { acceptUrl: string };
   assert.equal(response.status, 201);
   assert.equal(
     (

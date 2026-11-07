@@ -151,7 +151,9 @@ const atom = (text: string, item: Item | undefined, input: Record<string, unknow
   return match[2] === ">" ? left > right : left < right
 }
 
-const condition = (expression: string | undefined, item: Item | undefined, input: Record<string, unknown>) => {
+// Annotated because it recurses: TypeScript cannot infer a return type from
+// an expression that calls the function being inferred.
+const condition = (expression: string | undefined, item: Item | undefined, input: Record<string, unknown>): boolean => {
   if (!expression) return true
   if (expression.includes(" OR ")) return expression.split(" OR ").some((part) => condition(part.trim(), item, input))
   return expression.split(" AND ").every((part) => atom(part.trim(), item, input))
