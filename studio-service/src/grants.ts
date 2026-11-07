@@ -5,12 +5,13 @@ import {
   type PublishStorage,
   type PublishedObject,
 } from "../../backend/src/site-manager/core.ts"
-import { commitCatalogue, commitRemoval, pageCatalogue, type ManifestStore } from "./catalogue.ts"
+import { CatalogueError, commitCatalogue, commitRemoval, pageCatalogue, type ManifestStore } from "./catalogue.ts"
 import {
   DESTINATIONS,
   UPLOAD_TTL_SECONDS,
   destinationById,
   labelFor,
+  manifestLocationFor,
   objectKeyFor,
   type StudioDestination,
 } from "./destinations.ts"
@@ -348,7 +349,7 @@ export const createStudioService = (options: {
       }
       await commitCatalogue(
         options.manifests,
-        destination.manifestKey,
+        manifestLocationFor(destination),
         published,
         new Date(now()).toISOString(),
       )
@@ -551,14 +552,45 @@ export const createStudioService = (options: {
       if (!key) {
         throw new SiteManagerError(403, "destination_denied", "That file is not on this page.")
       }
-      await commitRemoval(
-        options.manifests,
-        destination.manifestKey,
-        { url, section: destination.section },
-        new Date(now()).toISOString(),
-      )
-      if (options.deleteObject) {
+      /**
+       * The entry and the object are removed independently, because they can
+       * disagree - and when they do, an orphan is still a file on this page.
+       *
+       * A completion that stored the bytes and then failed to write the
+       * manifest leaves an object with no catalogue entry. The old order made
+       * that permanent: commitRemoval throws 404 when there is no entry, so
+       * the delete below never ran, and the only way to clear an orphan was
+       * the AWS console. Four were cleared that way on 6 November 2026, after
+       * the three 503s of 2 November left their bytes behind.
+       *
+       * Deleting without an entry widens nothing: objectKeyFor has already
+       * proved this key sits inside this destination's own prefix, and that
+       * is the same check the entry path relies on.
+       */
+      let listed = true
+      try {
+        await commitRemoval(
+          options.manifests,
+          manifestLocationFor(destination),
+          { url, section: destination.section },
+          new Date(now()).toISOString(),
+        )
+      } catch (error) {
+        if (error instanceof CatalogueError && error.code === "not_found") {
+          listed = false
+        } else {
+          throw error
+        }
+      }
+
+      // HEAD before DELETE, because S3 deletes a key that was never there
+      // without complaining, and "removed" has to mean something was.
+      const stored = await options.storage.inspectUpload(key)
+      if (stored && options.deleteObject) {
         await options.deleteObject(key)
+      }
+      if (!listed && !stored) {
+        throw new CatalogueError(404, "not_found", "That file is not on this page.")
       }
       return { removed: true }
     },

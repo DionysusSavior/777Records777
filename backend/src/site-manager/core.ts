@@ -178,20 +178,45 @@ type Receipt = {
   releaseId?: string
 }
 
-const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> = {
+/**
+ * What may be published, and what the manifest will call it.
+ *
+ * `canonical` exists because this table had SIX entries the website's own
+ * parser does not know - the x- aliases, audio/m4a, audio/aac, audio/flac and
+ * video/webm - and the manifest recorded whichever spelling the client sent.
+ * The website's parser is all-or-nothing: one row it cannot read refuses the
+ * WHOLE document, `readManifest` returns null, and the artist's page falls
+ * back to its static content with no error logged anywhere. So a FLAC or an
+ * `audio/x-wav` would upload, store, write its entry, and silently empty the
+ * shelf it had just been added to.
+ *
+ * Two halves to keeping that shut, and both are needed. An alias is folded to
+ * the spelling the website knows, below. A format the website genuinely did
+ * not list - aac, flac, webm - was added to MEDIA_RULES in
+ * storefront/src/lib/site-manager-manifest.ts instead, because this service
+ * already advertises them and taking them away would refuse files it accepts
+ * today.
+ *
+ * The test "every publishable media type survives the website's parser" in
+ * studio-service/test/studio.test.ts publishes one file of every type here
+ * and parses the result with the website's own code. It fails the moment
+ * these two lists disagree again, which is the only thing that keeps this
+ * comment true.
+ */
+export const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[]; canonical?: string }> = {
   "audio/aac": { extension: "aac", kinds: ["audio"] },
   // The phone's picker offers AIFF, its own type table maps it, the website's
   // manifest parser accepts it and the bundle script reads it. This table was
   // the only place that did not know about it, so choosing a master in the
   // format Logic exports answered 415 after the file had been chosen.
   "audio/aiff": { extension: "aiff", kinds: ["audio"] },
-  "audio/x-aiff": { extension: "aiff", kinds: ["audio"] },
+  "audio/x-aiff": { extension: "aiff", kinds: ["audio"], canonical: "audio/aiff" },
   "audio/flac": { extension: "flac", kinds: ["audio"] },
-  "audio/m4a": { extension: "m4a", kinds: ["audio"] },
+  "audio/m4a": { extension: "m4a", kinds: ["audio"], canonical: "audio/mp4" },
   "audio/mp4": { extension: "m4a", kinds: ["audio"] },
   "audio/mpeg": { extension: "mp3", kinds: ["audio"] },
   "audio/wav": { extension: "wav", kinds: ["audio"] },
-  "audio/x-wav": { extension: "wav", kinds: ["audio"] },
+  "audio/x-wav": { extension: "wav", kinds: ["audio"], canonical: "audio/wav" },
   "video/mp4": { extension: "mp4", kinds: ["reel", "video"] },
   "video/quicktime": { extension: "mov", kinds: ["reel", "video"] },
   "video/webm": { extension: "webm", kinds: ["reel", "video"] },
@@ -201,6 +226,18 @@ const CONTENT_TYPES: Record<string, { extension: string; kinds: MediaKind[] }> =
   "application/octet-stream": { extension: "om7", kinds: ["bundle"] },
 }
 
+/**
+ * The spelling the manifest records, which is the spelling the website reads.
+ *
+ * Applied where the published object is built and nowhere else: the receipt
+ * and the stored object keep the client's own string, because that string is
+ * what was signed into the presigned PUT and what S3 will report back for the
+ * match check in completeReceipt. Canonicalising earlier would make the phone
+ * send one content-type and the signature expect another.
+ */
+export const canonicalContentType = (contentType: string): string =>
+  CONTENT_TYPES[contentType]?.canonical ?? contentType
+
 export class SiteManagerError extends Error {
   readonly status: number
   readonly code: string
@@ -209,6 +246,44 @@ export class SiteManagerError extends Error {
     this.status = status
     this.code = code
   }
+}
+
+/**
+ * Which page a failure was about, carried on the error itself.
+ *
+ * The handler logs `destinationId` out of the query string, and neither call
+ * that actually publishes puts it there: POST /uploads sends it in the body,
+ * and POST /uploads/complete does not send it at all - the destination lives
+ * inside the HMAC-signed receipt, which only this module can open. So every
+ * refusal and every 503 on the publish path logged `destinationId: undefined`.
+ * On 2 November 2026 three 503s from viz-sounds were indistinguishable from
+ * three 503s from anywhere else, and working out which page they were about
+ * meant reading the request bodies back out of a phone.
+ *
+ * Stamped non-enumerably, so it stays out of `JSON.stringify(error)` and can
+ * never reach a response body. This is for the log, not for the caller.
+ *
+ * Attached to ANY thrown value rather than only a SiteManagerError, because
+ * the failure worth naming is the one nobody modelled: an AccessDenied from
+ * S3 becomes a generic 503, and that is precisely the line that needs to say
+ * which page it was.
+ */
+export const withDestination = <E>(error: E, destinationId: string | undefined): E => {
+  if (
+    destinationId &&
+    typeof error === "object" &&
+    error !== null &&
+    !("destinationId" in error)
+  ) {
+    Object.defineProperty(error, "destinationId", { value: destinationId, enumerable: false })
+  }
+  return error
+}
+
+export const destinationOf = (error: unknown): string | undefined => {
+  if (typeof error !== "object" || error === null) return undefined
+  const found = (error as { destinationId?: unknown }).destinationId
+  return typeof found === "string" ? found : undefined
 }
 
 const canonicalSha256 = (value: unknown) => {
@@ -314,6 +389,89 @@ const titleFor = (raw: unknown, fallback: string) => {
 const sectionAllows = (section: PublishSection, mediaKind: MediaKind) => {
   if (section === "movies") return mediaKind === "video"
   return mediaKind !== "video"
+}
+
+/**
+ * The body of `complete`, lifted out of the method so that every failure
+ * inside it can be stamped with the destination from the receipt. See
+ * withDestination: the 503 worth naming is the one thrown by onPublished,
+ * long after the last request field that named the page was consumed.
+ */
+const completeReceipt = async (
+  config: SiteManagerConfig,
+  storage: PublishStorage,
+  authorization: string | undefined,
+  receipt: Receipt,
+) => {
+    let scope: ResolvedGrant | null = null
+    if (config.resolveGrant) {
+      // A version-1 receipt has no destination. Completing it here would file
+      // it under whichever grant the token holds now.
+      if (receipt.v !== 2 || !receipt.destinationId) {
+        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
+      }
+      scope = await config.resolveGrant(authorization, receipt.destinationId)
+      if (
+        scope.grantId !== receipt.grantId ||
+        scope.grantVersion !== receipt.grantVersion ||
+        scope.section !== receipt.section ||
+        !receipt.key.startsWith(`${scope.keyPrefix}/`)
+      ) {
+        throw new SiteManagerError(401, "unauthorized", "This publishing grant is no longer valid for that upload.")
+      }
+    } else {
+      requireAuthorization(authorization, config)
+      if (receipt.v !== 1) {
+        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
+      }
+    }
+    const stored = await storage.inspectUpload(receipt.key)
+    if (!stored) {
+      throw new SiteManagerError(409, "upload_missing", "The upload is not present in the site's storage.")
+    }
+    if (
+      stored.contentLength !== receipt.contentLength ||
+      stored.contentType?.toLowerCase() !== receipt.contentType ||
+      stored.checksumSha256 !== receipt.checksumSha256
+    ) {
+      throw new SiteManagerError(409, "upload_mismatch", "The stored file does not match the upload request.")
+    }
+
+    let pageUrl: string | undefined
+    if (scope && config.onPublished) {
+      const published = await config.onPublished({
+        key: receipt.key,
+        publicUrl: receipt.publicUrl,
+        mediaKind: receipt.mediaKind,
+        // The one place an alias is folded away. See canonicalContentType.
+        contentType: canonicalContentType(receipt.contentType),
+        contentLength: receipt.contentLength,
+        checksumSha256: receipt.checksumSha256,
+        downloadName: downloadNameFor(receipt.title, receipt.key.split(".").pop() || "bin"),
+        title: receipt.title || "Untitled",
+        destinationId: scope.destinationId,
+        section: scope.section,
+        releaseId: receipt.releaseId,
+      })
+      pageUrl = published.pageUrl
+    }
+
+    return {
+      protocol: SITE_MANAGER_PROTOCOL,
+      version: SITE_MANAGER_VERSION,
+      status: "published" as const,
+      publicUrl: receipt.publicUrl,
+      pageUrl,
+      // Version 1's smallest useful audio case has no generated landing page.
+      // A richer adapter may later make this a site page instead of the object.
+      downloadUrl: receipt.mediaKind === "audio" || receipt.mediaKind === "bundle"
+        ? receipt.publicUrl
+        : undefined,
+      mediaKind: receipt.mediaKind,
+      contentType: receipt.contentType,
+      contentLength: receipt.contentLength,
+      checksumSha256: receipt.checksumSha256,
+    }
 }
 
 export const createSiteManager = (config: SiteManagerConfig, storage: PublishStorage) => ({
@@ -450,73 +608,11 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
 
   async complete(authorization: string | undefined, uploadReceipt: unknown) {
     const receipt = decodeReceipt(uploadReceipt, config.receiptSecret)
-    let scope: ResolvedGrant | null = null
-    if (config.resolveGrant) {
-      // A version-1 receipt has no destination. Completing it here would file
-      // it under whichever grant the token holds now.
-      if (receipt.v !== 2 || !receipt.destinationId) {
-        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
-      }
-      scope = await config.resolveGrant(authorization, receipt.destinationId)
-      if (
-        scope.grantId !== receipt.grantId ||
-        scope.grantVersion !== receipt.grantVersion ||
-        scope.section !== receipt.section ||
-        !receipt.key.startsWith(`${scope.keyPrefix}/`)
-      ) {
-        throw new SiteManagerError(401, "unauthorized", "This publishing grant is no longer valid for that upload.")
-      }
-    } else {
-      requireAuthorization(authorization, config)
-      if (receipt.v !== 1) {
-        throw new SiteManagerError(400, "invalid_receipt", "The upload receipt is invalid.")
-      }
-    }
-    const stored = await storage.inspectUpload(receipt.key)
-    if (!stored) {
-      throw new SiteManagerError(409, "upload_missing", "The upload is not present in the site's storage.")
-    }
-    if (
-      stored.contentLength !== receipt.contentLength ||
-      stored.contentType?.toLowerCase() !== receipt.contentType ||
-      stored.checksumSha256 !== receipt.checksumSha256
-    ) {
-      throw new SiteManagerError(409, "upload_mismatch", "The stored file does not match the upload request.")
-    }
-
-    let pageUrl: string | undefined
-    if (scope && config.onPublished) {
-      const published = await config.onPublished({
-        key: receipt.key,
-        publicUrl: receipt.publicUrl,
-        mediaKind: receipt.mediaKind,
-        contentType: receipt.contentType,
-        contentLength: receipt.contentLength,
-        checksumSha256: receipt.checksumSha256,
-        downloadName: downloadNameFor(receipt.title, receipt.key.split(".").pop() || "bin"),
-        title: receipt.title || "Untitled",
-        destinationId: scope.destinationId,
-        section: scope.section,
-        releaseId: receipt.releaseId,
-      })
-      pageUrl = published.pageUrl
-    }
-
-    return {
-      protocol: SITE_MANAGER_PROTOCOL,
-      version: SITE_MANAGER_VERSION,
-      status: "published" as const,
-      publicUrl: receipt.publicUrl,
-      pageUrl,
-      // Version 1's smallest useful audio case has no generated landing page.
-      // A richer adapter may later make this a site page instead of the object.
-      downloadUrl: receipt.mediaKind === "audio" || receipt.mediaKind === "bundle"
-        ? receipt.publicUrl
-        : undefined,
-      mediaKind: receipt.mediaKind,
-      contentType: receipt.contentType,
-      contentLength: receipt.contentLength,
-      checksumSha256: receipt.checksumSha256,
+    try {
+      return await completeReceipt(config, storage, authorization, receipt)
+    } catch (error) {
+      // Whatever this was, the log line now names the page it was about.
+      throw withDestination(error, receipt.destinationId)
     }
   },
 })

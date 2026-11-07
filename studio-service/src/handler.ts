@@ -1,5 +1,5 @@
 import type { createAdminService } from "./admins.ts"
-import { SiteManagerError } from "../../backend/src/site-manager/core.ts"
+import { SiteManagerError, destinationOf } from "../../backend/src/site-manager/core.ts"
 import { CatalogueError } from "./catalogue.ts"
 import { IdentityError, type VerifiedIdentity } from "./identity.ts"
 import type { StudioService } from "./grants.ts"
@@ -40,13 +40,14 @@ const note = (
   status: number,
   code: string,
   message: string,
+  destinationId: string | undefined,
   unexpected?: unknown,
 ) => {
   const line = JSON.stringify({
     at: "site-manager",
     method: request.method,
     path: url.pathname,
-    destinationId: url.searchParams.get("destinationId") ?? undefined,
+    destinationId,
     status,
     code,
     message,
@@ -59,6 +60,16 @@ const note = (
   // nothing else in the response says where it came from.
   console.error(line, unexpected instanceof Error ? unexpected.stack : unexpected)
 }
+
+/**
+ * A destination id fit to put in a log line.
+ *
+ * Length-bounded because this is caller-supplied text on its way into
+ * CloudWatch, and an unbounded field is an unbounded log line. JSON.stringify
+ * handles the quoting, so a newline cannot forge a second entry.
+ */
+const asDestinationId = (value: unknown): string | undefined =>
+  typeof value === "string" && value.length > 0 && value.length <= 64 ? value : undefined
 
 const fail = (error: unknown) => {
   if (error instanceof SiteManagerError || error instanceof CatalogueError) {
@@ -112,6 +123,15 @@ export const handle = async (
   publicOrigin: string | null = null,
 ): Promise<Response> => {
   const url = new URL(request.url)
+  /**
+   * Which page this request is about, for the log only.
+   *
+   * GET /catalogue puts it in the query string; everything else that names a
+   * destination sends it in the body, so it is captured as each body is read.
+   * A completion never sends it at all - that one arrives stamped on the
+   * error by core.ts, which is the only code that can open the receipt.
+   */
+  let destinationId = asDestinationId(url.searchParams.get("destinationId"))
   const origin = request.headers.get("origin")
   const allow = origin !== null && deps.allowedOrigins.includes(origin)
   const cors: Record<string, string> = allow
@@ -147,6 +167,7 @@ export const handle = async (
     }
     if (request.method === "POST" && path === "/catalogue/remove") {
       const body = await readJson(request)
+      destinationId = asDestinationId(body.destinationId) ?? destinationId
       return json(200, await deps.service.removePublished(
         request.headers.get("authorization") ?? undefined,
         body.destinationId,
@@ -155,6 +176,7 @@ export const handle = async (
     }
     if (request.method === "POST" && path === "/uploads") {
       const body = await readJson(request)
+      destinationId = asDestinationId(body.destinationId) ?? destinationId
       return json(201, await deps.service.begin(request.headers.get("authorization") ?? undefined, body), cors)
     }
     if (request.method === "POST" && path === "/uploads/complete") {
@@ -177,6 +199,7 @@ export const handle = async (
     }
     if (request.method === "POST" && path === "/admin/invites") {
       const body = await readJson(request)
+      destinationId = asDestinationId(body.destinationId) ?? destinationId
       return json(201, await deps.service.createInvite(identity, body), cors)
     }
     if (request.method === "POST" && path === "/me/invites/view") {
@@ -209,7 +232,7 @@ export const handle = async (
       const body = await readJson(request)
       return json(200, await deps.service.forceReconnect(identity, body.grantId), cors)
     }
-    note(request, url, 404, "not_found", "Nothing is published at that path.")
+    note(request, url, 404, "not_found", "Nothing is published at that path.", destinationId)
     return json(404, { error: { code: "not_found", message: "Nothing is published at that path." } }, cors)
   } catch (error) {
     const response = fail(error)
@@ -220,6 +243,9 @@ export const handle = async (
       response.status,
       known ? error.code : error instanceof IdentityError ? "unauthorized" : "unhandled",
       error instanceof Error ? error.message : String(error),
+      // core.ts stamps the destination from the signed receipt when it had
+      // one; otherwise it is whatever this request named.
+      destinationOf(error) ?? destinationId,
       known || error instanceof IdentityError ? undefined : error,
     )
     const headers = new Headers(response.headers)

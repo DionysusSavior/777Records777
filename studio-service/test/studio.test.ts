@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
-import type { PublishStorage, StoredUpload, UploadDescriptor } from "../../backend/src/site-manager/core.ts"
-import { applyCatalogue, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { CONTENT_TYPES, canonicalContentType, type PublishStorage, type StoredUpload, type UploadDescriptor } from "../../backend/src/site-manager/core.ts"
+import { applyCatalogue, commitCatalogue, commitRemoval, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
 import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
-import { destinationById, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
+import { destinationById, manifestLocationFor, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle } from "../src/handler.ts"
 import { IdentityError, verifyIdToken } from "../src/identity.ts"
@@ -42,7 +42,17 @@ const storage = () => {
       return objects.get(key) ?? null
     },
   }
-  return { fake, issued: () => issued }
+  const deleted: string[] = []
+  return {
+    fake,
+    issued: () => issued,
+    deleted,
+    deleteObject: async (key: string) => {
+      deleted.push(key)
+      objects.delete(key)
+    },
+    has: (key: string) => objects.has(key),
+  }
 }
 
 const manifests = (): ManifestStore & { snapshot: (key: string) => string | null; conflictsLeft: number } => {
@@ -85,6 +95,7 @@ const setup = (freshnessMs = 0) => {
     store: memoryGrantStore(),
     manifests: catalogue,
     storage: files.fake,
+    deleteObject: files.deleteObject,
     receiptSecret: "test-only-receipt-secret-that-is-long-enough",
     admins: new Set([ADMIN]),
     now: () => clock,
@@ -424,6 +435,142 @@ test("a sound can be listed and removed without touching movies or inventing rel
   assert.equal(next.movies.length, 1)
 })
 
+test("an orphan can be removed, and removing nothing is still a 404", async () => {
+  /*
+   The gap that made four files unreachable.
+
+   An upload that stores its bytes and then fails to write the manifest leaves
+   an object with no catalogue entry. removePublished used to commit the entry
+   removal FIRST, and commitRemoval throws 404 when there is no entry - so the
+   delete never ran and the object could only be cleared from the AWS console.
+   That is how the three 503s of 2 November 2026 turned into orphans.
+
+   Here `begin` alone produces exactly that state: the fake storage holds the
+   key the moment the upload is issued, and nothing has completed.
+  */
+  const rig = setup()
+  const invited = await rig.service.createInvite(rig.identity(ADMIN), {
+    destinationId: "viz-sounds",
+    recipientEmail: VIZ_EMAIL,
+  })
+  const grant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), invited.inviteId)
+
+  await rig.service.begin(`Bearer ${grant.token}`, audio("viz-sounds"))
+  const key = rig.files.issued()?.key ?? ""
+  assert.match(key, /^site-manager\/viz\/[0-9a-f-]+\.mp3$/)
+  assert.equal(rig.catalogue.snapshot("site-manager/viz/index.json"), null)
+  assert.ok(rig.files.has(key))
+
+  const url = `https://777records777productpageassets.s3.us-east-2.amazonaws.com/${key}`
+  assert.deepEqual(
+    await rig.service.removePublished(`Bearer ${grant.token}`, "viz-sounds", url),
+    { removed: true },
+  )
+  assert.deepEqual(rig.files.deleted, [key])
+  assert.equal(rig.files.has(key), false)
+
+  // Removing it twice is removing nothing: no entry, no object, so 404 rather
+  // than a cheerful lie. This is the case the orphan path must not swallow.
+  await assert.rejects(
+    () => rig.service.removePublished(`Bearer ${grant.token}`, "viz-sounds", url),
+    (error: { status: number; code: string }) => error.status === 404 && error.code === "not_found",
+  )
+  assert.deepEqual(rig.files.deleted, [key])
+
+  // And a key outside this destination's prefix is still refused outright,
+  // before anything is read or deleted.
+  await assert.rejects(
+    () => rig.service.removePublished(
+      `Bearer ${grant.token}`,
+      "viz-sounds",
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/product-pages/anything.jpg",
+    ),
+    (error: { status: number; code: string }) => error.status === 403 && error.code === "destination_denied",
+  )
+})
+
+test("a published file still leaves the catalogue and the object together", async () => {
+  const rig = setup()
+  const invited = await rig.service.createInvite(rig.identity(ADMIN), {
+    destinationId: "viz-sounds",
+    recipientEmail: VIZ_EMAIL,
+  })
+  const grant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), invited.inviteId)
+  const begun = await rig.service.begin(`Bearer ${grant.token}`, audio("viz-sounds"))
+  const key = rig.files.issued()?.key ?? ""
+  await rig.service.complete(`Bearer ${grant.token}`, begun.uploadReceipt)
+  assert.equal(JSON.parse(rig.catalogue.snapshot("site-manager/viz/index.json") ?? "{}").items.length, 1)
+
+  const url = `https://777records777productpageassets.s3.us-east-2.amazonaws.com/${key}`
+  assert.deepEqual(
+    await rig.service.removePublished(`Bearer ${grant.token}`, "viz-sounds", url),
+    { removed: true },
+  )
+  assert.equal(JSON.parse(rig.catalogue.snapshot("site-manager/viz/index.json") ?? "{}").items.length, 0)
+  assert.deepEqual(rig.files.deleted, [key])
+})
+
+test("every publishable media type survives the website's parser", async () => {
+  /*
+   The guard the two tables never had.
+
+   core.ts decides what may be uploaded; the storefront decides what may be
+   rendered. They were written apart and drifted: SIX of the service's content
+   types were absent from MEDIA_RULES, and because that parser refuses the
+   WHOLE document over one unreadable row, publishing any of them would have
+   emptied the artist's shelf instead of adding to it - silently, since the
+   page just falls back to its static content.
+
+   Checking the lists against each other would not have caught it: the service
+   records the type the CLIENT sent, so the question is what ends up in the
+   manifest, not what the table says. So this publishes one real file of every
+   type the service accepts and hands the result to the website's own parser.
+  */
+  for (const [contentType, rule] of Object.entries(CONTENT_TYPES)) {
+    const mediaKind = rule.kinds[0]
+    // movies take video and nothing else; sounds take everything but video.
+    const toMovies = rule.kinds.includes("video") && mediaKind === "video"
+    const destinationId = toMovies ? "viz-movies" : "viz-sounds"
+    const manifestUrl =
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json"
+
+    const rig = setup()
+    const invited = await rig.service.createInvite(rig.identity(ADMIN), {
+      destinationId,
+      recipientEmail: VIZ_EMAIL,
+    })
+    const grant = await rig.service.acceptInvite(rig.identity(VIZ, VIZ_EMAIL), invited.inviteId)
+    const begun = await rig.service.begin(`Bearer ${grant.token}`, {
+      ...audio(destinationId),
+      mediaKind,
+      contentType,
+      filename: `master.${rule.extension}`,
+      title: `A ${contentType} file`,
+    })
+    await rig.service.complete(`Bearer ${grant.token}`, begun.uploadReceipt)
+
+    const written = rig.catalogue.snapshot("site-manager/viz/index.json")
+    assert.ok(written, `${contentType}: nothing was written`)
+    assert.ok(
+      parseSiteManagerManifest(written, manifestUrl),
+      `${contentType} published a manifest the website refuses, which empties the whole shelf`
+    )
+
+    // And the manifest records the canonical spelling, not the alias, because
+    // the alias is exactly what the website cannot read.
+    const parsed = JSON.parse(written)
+    const row = [...(parsed.items ?? []), ...(parsed.movies ?? [])][0]
+    assert.ok(row, `${contentType}: no row in the manifest`)
+    if (!toMovies) {
+      assert.equal(
+        row.contentType,
+        canonicalContentType(contentType),
+        `${contentType}: the manifest kept the alias`
+      )
+    }
+  }
+})
+
 test("what the service writes, the website accepts - bundle included", () => {
   /*
    The guard this file did not have.
@@ -734,5 +881,137 @@ test("catalogue apply refuses a malformed manifest and keeps both additions", ()
       section: "sounds",
     }, "2026-10-25T00:00:00.000Z"),
     (error: { code: string }) => error.code === "catalogue_malformed",
+  )
+})
+
+/*
+ The three below are about the guard in front of every manifest write, and
+ they share a fixture: a row this service would store and the website cannot
+ read. `audio/x-aiff` is the real thing rather than a stand-in - it is one of
+ the three aliases CONTENT_TYPES accepts and MEDIA_RULES has never had, and
+ the only reason a published AIFF is readable today is the canonicalisation
+ added on 7 November 2026. Remove that and these tests fail here, at the
+ write, instead of on the artist's page.
+*/
+const VIZ_MANIFEST = manifestLocationFor(destinationById("viz-sounds")!)
+
+const unreadableRow = (id: string) => ({
+  id,
+  kind: "audio",
+  title: "AIFF master",
+  url: `https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/${id}.aiff`,
+  contentType: "audio/x-aiff",
+  bytes: 1024,
+  publishedAt: "2026-11-07T00:00:00.000Z",
+})
+
+const brokenPage = (...ids: string[]) => JSON.stringify({
+  protocol: "om7.site-manager.manifest",
+  version: 1,
+  updatedAt: "2026-11-07T00:00:00.000Z",
+  items: ids.map(unreadableRow),
+})
+
+test("the writer refuses a row the website cannot read, and leaves nothing behind", async () => {
+  /*
+   Refuse at the writer, not at the reader.
+
+   Fixing the four faults made the writer's output a subset of what the parser
+   accepts, and `every publishable media type survives the website's parser`
+   holds that true. But the two tables are in different packages and were
+   already edited apart once, at a cost of weeks. So the parser now runs on
+   the body before it is written, and a manifest the website would refuse is
+   never stored in the first place.
+
+   The store is asserted empty afterwards because refusing late is the one
+   outcome that would be worse than not refusing: a page half replaced is a
+   page nobody can reason about.
+  */
+  const store = manifests()
+  await assert.rejects(
+    () => commitCatalogue(store, VIZ_MANIFEST, {
+      key: "site-manager/viz/22222222-2222-4222-8222-222222222222.aiff",
+      publicUrl: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/22222222-2222-4222-8222-222222222222.aiff",
+      mediaKind: "audio",
+      contentType: "audio/x-aiff",
+      contentLength: 1024,
+      checksumSha256: checksum,
+      downloadName: "master.aiff",
+      title: "AIFF master",
+      destinationId: "viz-sounds",
+      section: "sounds",
+    }, "2026-11-07T00:00:00.000Z"),
+    (error: { code: string; status: number }) =>
+      error.code === "catalogue_unreadable" && error.status === 500,
+  )
+  assert.equal(store.snapshot(VIZ_MANIFEST.key), null, "the page was written anyway")
+})
+
+test("a page the website already refuses is still publishable, not locked", async () => {
+  /*
+   The exception is the point of the guard, not a hole in it.
+
+   Refusing every write that leaves the page unreadable would mean an artist
+   whose manifest is ALREADY unreadable - written before the fixes, or by the
+   phone's direct mode, which replaces the object without this protocol - could
+   never publish again. The page is no worse for another good row, and the
+   artist is much worse off unable to touch it.
+  */
+  const store = manifests()
+  await store.write(VIZ_MANIFEST.key, brokenPage("33333333-3333-4333-8333-333333333333"), null)
+  const before = store.snapshot(VIZ_MANIFEST.key)
+  assert.equal(parseSiteManagerManifest(before!, VIZ_MANIFEST.url), null, "the fixture is not broken")
+
+  await commitCatalogue(store, VIZ_MANIFEST, {
+    key: "site-manager/viz/44444444-4444-4444-8444-444444444444.wav",
+    publicUrl: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/44444444-4444-4444-8444-444444444444.wav",
+    mediaKind: "audio",
+    contentType: "audio/wav",
+    contentLength: 2048,
+    checksumSha256: checksum,
+    downloadName: "master.wav",
+    title: "A readable one",
+    destinationId: "viz-sounds",
+    section: "sounds",
+  }, "2026-11-07T01:00:00.000Z")
+
+  const written = JSON.parse(store.snapshot(VIZ_MANIFEST.key) ?? "{}")
+  assert.equal(written.items.length, 2, "the good row was not added")
+})
+
+test("a broken page can be repaired one removal at a time", async () => {
+  /*
+   The recovery path, and the reason the exception above is not optional.
+
+   Two unreadable rows take two removals, and after the first one the page is
+   still unreadable. A guard without the exception would refuse that first
+   removal and the artist could never reach the second - stuck on a page that
+   shows none of their work, with the one control that would fix it disabled.
+  */
+  const store = manifests()
+  const first = "55555555-5555-4555-8555-555555555555"
+  const second = "66666666-6666-4666-8666-666666666666"
+  await store.write(VIZ_MANIFEST.key, brokenPage(first, second), null)
+
+  await commitRemoval(
+    store,
+    VIZ_MANIFEST,
+    { url: unreadableRow(first).url, section: "sounds" },
+    "2026-11-07T02:00:00.000Z",
+  )
+  const halfway = store.snapshot(VIZ_MANIFEST.key)
+  assert.equal(JSON.parse(halfway ?? "{}").items.length, 1, "the first removal was refused")
+  assert.equal(parseSiteManagerManifest(halfway!, VIZ_MANIFEST.url), null, "still unreadable, as expected")
+
+  await commitRemoval(
+    store,
+    VIZ_MANIFEST,
+    { url: unreadableRow(second).url, section: "sounds" },
+    "2026-11-07T03:00:00.000Z",
+  )
+  const repaired = store.snapshot(VIZ_MANIFEST.key)
+  assert.ok(
+    parseSiteManagerManifest(repaired!, VIZ_MANIFEST.url),
+    "the page is readable again once the bad rows are gone",
   )
 })

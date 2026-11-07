@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { PublishedObject } from "../../backend/src/site-manager/core.ts"
+import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
 
 const PROTOCOL = "om7.site-manager.manifest"
 const VERSION = 1
@@ -221,7 +222,13 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
     const existing = role === null ? -1 : published.releaseId
       ? source.releases.findIndex((r) => isRecord(r) && r.id === published.releaseId)
       : -1
-    if (existing >= 0) {
+    // `role !== null` is already guaranteed here - `existing` is -1 whenever
+    // the role is null, three lines up - but the guarantee travels through a
+    // number, so the compiler cannot see it and `[role]` below would be a
+    // key of type `string | null`. Stated rather than cast: a cast would
+    // have silenced the one check that would notice if that sentinel ever
+    // stopped being set.
+    if (role !== null && existing >= 0) {
       const release = source.releases[existing] as Record<string, unknown>
       source.releases = source.releases.map((r, at) => at !== existing ? r : {
         ...release,
@@ -394,17 +401,68 @@ export const removeFromCatalogue = (
   return JSON.stringify(source)
 }
 
+/**
+ * Where one manifest lives, as the writer and the website each see it.
+ *
+ * Two strings that would be easy to transpose, so they travel together.
+ * `key` is what the compare-and-swap runs against. `url` is where the website
+ * fetches it from, and the parser needs it: it refuses any media URL that is
+ * not on the manifest's own origin, so the check below cannot be made with
+ * the key alone.
+ */
+export type ManifestLocation = {
+  key: string
+  url: string
+}
+
+/**
+ * Refuse to be the write that empties the page.
+ *
+ * The storefront's parser answers null for the WHOLE document over one
+ * unreadable row, and the page then falls back to its static content with
+ * HTTP 200. So one bad row does not look like a bad row - it looks like every
+ * release the artist ever published has been deleted, with nothing failing
+ * anywhere. The four faults found on 7 November 2026 all had that shape, and
+ * the dearest of them - six content types this service accepted and the
+ * website did not - survived because neither side ever asked the other.
+ *
+ * After those fixes the writer's output is a verified subset of what the
+ * parser accepts; `every publishable media type survives the website's
+ * parser` is what proves it. This is the backstop for the NEXT drift, because
+ * the two tables live in different packages and will be edited apart again.
+ *
+ * It runs on the body about to be written rather than on the request, because
+ * what the request carries is not what the manifest ends up saying.
+ *
+ * The exception is the point of it, not a hole in it. A manifest the parser
+ * already refuses is not made worse by another write, and refusing one would
+ * be a trap: the artist could never publish OR remove anything on that page
+ * again, which is precisely when they need to most. So this blocks only a
+ * write that would turn a readable page into an unreadable one.
+ */
+const refuseUnreadable = (manifest: ManifestLocation, prior: string | null, next: string) => {
+  if (parseSiteManagerManifest(next, manifest.url)) return
+  const had = prior !== null && prior.trim() !== ""
+  if (had && !parseSiteManagerManifest(prior, manifest.url)) return
+  throw new CatalogueError(
+    500,
+    "catalogue_unreadable",
+    "The page was left as it was, because this change would have hidden everything on it.",
+  )
+}
+
 export const commitRemoval = async (
   store: ManifestStore,
-  manifestKey: string,
+  manifest: ManifestLocation,
   target: { url: string; section: "sounds" | "movies" },
   updatedAt: string,
 ) => {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const current = await store.read(manifestKey)
+    const current = await store.read(manifest.key)
     if (!current) throw new CatalogueError(404, "not_found", "That file is not on this page.")
     const body = removeFromCatalogue(current.body, target, updatedAt)
-    const written = await store.write(manifestKey, body, current.etag)
+    refuseUnreadable(manifest, current.body, body)
+    const written = await store.write(manifest.key, body, current.etag)
     if ("etag" in written) return
   }
   throw new CatalogueError(409, "catalogue_conflict", "The page changed while that file was being removed. Try again.")
@@ -412,15 +470,18 @@ export const commitRemoval = async (
 
 export const commitCatalogue = async (
   store: ManifestStore,
-  manifestKey: string,
+  manifest: ManifestLocation,
   published: PublishedObject,
   publishedAt: string,
 ) => {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const current = await store.read(manifestKey)
+    const current = await store.read(manifest.key)
     const next = applyCatalogue(current?.body ?? null, published, publishedAt)
     if (next.unchanged) return
-    const written = await store.write(manifestKey, next.body, current?.etag ?? null)
+    // Checked inside the loop, because a conflict recomputes the body
+    // from whatever the manifest says now.
+    refuseUnreadable(manifest, current?.body ?? null, next.body)
+    const written = await store.write(manifest.key, next.body, current?.etag ?? null)
     if ("etag" in written) return
   }
   throw new CatalogueError(409, "catalogue_conflict", "The catalogue changed while this file was being added. Retry completion; the file is already stored.")

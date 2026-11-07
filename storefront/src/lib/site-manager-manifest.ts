@@ -13,12 +13,20 @@ type MediaRule = {
 }
 
 const MEDIA_RULES: Record<string, MediaRule> = {
+  // aac, flac and webm are here because the publishing service accepts them
+  // and this parser did not, which is not a safe way to disagree: an item it
+  // cannot read refuses the whole manifest, so one FLAC emptied the shelf
+  // rather than being left off it. The service folds its x- aliases to the
+  // spellings below; see CONTENT_TYPES in backend/src/site-manager/core.ts.
+  "audio/aac": { kind: "audio", extensions: [".aac"] },
   "audio/aiff": { kind: "audio", extensions: [".aif", ".aiff"] },
+  "audio/flac": { kind: "audio", extensions: [".flac"] },
   "audio/mp4": { kind: "audio", extensions: [".m4a"] },
   "audio/mpeg": { kind: "audio", extensions: [".mp3"] },
   "audio/wav": { kind: "audio", extensions: [".wav"] },
   "video/mp4": { kind: "video", extensions: [".mp4"] },
   "video/quicktime": { kind: "video", extensions: [".mov"] },
+  "video/webm": { kind: "video", extensions: [".webm"] },
   "image/jpeg": { kind: "image", extensions: [".jpg", ".jpeg"] },
   "image/png": { kind: "image", extensions: [".png"] },
   "image/webp": { kind: "image", extensions: [".webp"] },
@@ -283,11 +291,49 @@ const parseRelease = (
  * presenting a partly trusted catalogue whose omissions look like deleted
  * releases.
  */
+/**
+ * Say which row was refused, without copying the row into the log.
+ *
+ * The id and the content type are enough to find it in the manifest and are
+ * not secrets. Titles and URLs are left out: this runs server-side on a page
+ * render, and an artist's unreleased title does not belong in a build log.
+ */
+/**
+ * An envelope refusal: the document's identity is wrong, so there is no row to
+ * name. Returns null so each call site stays a single statement.
+ *
+ * One bad row and one bad envelope both take the whole page down, and until
+ * 7 November both did it in complete silence - a refusal that logged nothing
+ * was how a writer/reader disagreement survived weeks. Whether a row SHOULD
+ * take the page down is a separate question and still open; this only makes
+ * the answer findable either way.
+ */
+const refuse = (manifestUrl: string, at: string, why: string): null => {
+  console.warn(JSON.stringify({ at: "site-manager-manifest", manifestUrl, refused: at, why }))
+  return null
+}
+
+const refused = (manifestUrl: string, at: string, raw: unknown) => {
+  const row = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {}
+  console.warn(
+    JSON.stringify({
+      at: "site-manager-manifest",
+      manifestUrl,
+      refused: at,
+      id: typeof row.id === "string" ? row.id : undefined,
+      contentType: typeof row.contentType === "string" ? row.contentType : undefined,
+      kind: typeof row.kind === "string" ? row.kind : undefined,
+    })
+  )
+}
+
 export const parseSiteManagerManifest = (
   input: string,
   manifestUrl: string
 ): SiteManagerManifest | null => {
-  if (new TextEncoder().encode(input).byteLength > MAX_MANIFEST_BYTES) return null
+  if (new TextEncoder().encode(input).byteLength > MAX_MANIFEST_BYTES) {
+    return refuse(manifestUrl, "size", `${new TextEncoder().encode(input).byteLength} bytes`)
+  }
 
   let source: unknown
   let expected: URL
@@ -295,18 +341,37 @@ export const parseSiteManagerManifest = (
     source = JSON.parse(input)
     expected = new URL(manifestUrl)
   } catch {
-    return null
+    return refuse(manifestUrl, "json", "not parseable as JSON, or the manifest URL is not a URL")
   }
-  if (expected.protocol !== "https:" || !isRecord(source)) return null
-  if (source.protocol !== PROTOCOL || source.version !== VERSION) return null
-  if (!isISOInstant(source.updatedAt) || !Array.isArray(source.items)) return null
-  if (source.items.length > MAX_ITEMS) return null
+  if (expected.protocol !== "https:" || !isRecord(source)) {
+    return refuse(manifestUrl, "envelope", "the manifest URL is not https, or the document is not an object")
+  }
+  if (source.protocol !== PROTOCOL || source.version !== VERSION) {
+    return refuse(manifestUrl, "protocol", `protocol=${String(source.protocol)} version=${String(source.version)}`)
+  }
+  if (!isISOInstant(source.updatedAt) || !Array.isArray(source.items)) {
+    return refuse(manifestUrl, "envelope", "updatedAt is not an ISO instant, or items is not an array")
+  }
+  if (source.items.length > MAX_ITEMS) {
+    return refuse(manifestUrl, "items", `${source.items.length} items, limit ${MAX_ITEMS}`)
+  }
 
   const items: SiteManagerManifestItem[] = []
   const itemIds = new Set<string>()
-  for (const raw of source.items) {
+  // An indexed loop, not items.entries(): this tsconfig's target cannot
+  // iterate an ArrayIterator without downlevelIteration.
+  for (let index = 0; index < source.items.length; index += 1) {
+    const raw = source.items[index]
     const item = parseItem(raw, expected.origin)
-    if (!item || itemIds.has(item.id)) return null
+    if (!item || itemIds.has(item.id)) {
+      // Refusing the document is this parser's documented choice, above. Not
+      // SAYING so was not: the page quietly fell back to its static content
+      // and nothing anywhere recorded which row did it. A content type the
+      // publishing service accepted and this list did not went unnoticed for
+      // weeks that way.
+      refused(manifestUrl, `items[${index}]`, raw)
+      return null
+    }
     itemIds.add(item.id)
     items.push(item)
   }
@@ -320,24 +385,29 @@ export const parseSiteManagerManifest = (
 
   if ("releases" in source) {
     if (!Array.isArray(source.releases) || source.releases.length > MAX_RELEASES) {
-      return null
+      return refuse(manifestUrl, "releases", "releases is not an array, or is over the limit")
     }
     const itemsById = new Map(items.map((item) => [item.id, item]))
     const releases: SiteManagerManifestRelease[] = []
     const releaseIds = new Set<string>()
     const referenced = new Set<string>()
-    for (const raw of source.releases) {
+    for (let index = 0; index < source.releases.length; index += 1) {
+      const raw = source.releases[index]
       const release = parseRelease(raw, itemsById)
       if (
         !release ||
         releaseIds.has(release.id) ||
         itemIds.has(release.id)
       ) {
+        refused(manifestUrl, `releases[${index}]`, raw)
         return null
       }
       for (const id of [release.audio, release.reel, release.artwork, release.bundle]) {
         if (!id) continue
-        if (referenced.has(id)) return null
+        if (referenced.has(id)) {
+          refused(manifestUrl, `releases[${index}] reuses item ${id}`, raw)
+          return null
+        }
         referenced.add(id)
       }
       releaseIds.add(release.id)
@@ -347,12 +417,18 @@ export const parseSiteManagerManifest = (
   }
 
   if ("movies" in source) {
-    if (!Array.isArray(source.movies) || source.movies.length > MAX_ITEMS) return null
+    if (!Array.isArray(source.movies) || source.movies.length > MAX_ITEMS) {
+      return refuse(manifestUrl, "movies", "movies is not an array, or is over the limit")
+    }
     const movies: SiteManagerMovie[] = []
     const movieIds = new Set<string>()
-    for (const raw of source.movies) {
+    for (let index = 0; index < source.movies.length; index += 1) {
+      const raw = source.movies[index]
       const movie = parseMovie(raw, expected.origin)
-      if (!movie || movieIds.has(movie.id) || itemIds.has(movie.id)) return null
+      if (!movie || movieIds.has(movie.id) || itemIds.has(movie.id)) {
+        refused(manifestUrl, `movies[${index}]`, raw)
+        return null
+      }
       movieIds.add(movie.id)
       movies.push(movie)
     }

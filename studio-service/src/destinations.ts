@@ -75,6 +75,22 @@ export const objectKeyFor = (destination: StudioDestination, url: string): strin
   return key
 }
 
+/**
+ * Where this destination's manifest lives, for a writer that has to answer
+ * what the WEBSITE will make of what it is about to write.
+ *
+ * Derived here rather than at the call site so the two never disagree: the
+ * parser checks every media URL against the manifest's own origin, and these
+ * two strings come from the same destination record that produced the media
+ * URLs in the first place.
+ */
+export const manifestLocationFor = (
+  destination: StudioDestination,
+): { key: string; url: string } => ({
+  key: destination.manifestKey,
+  url: new URL(destination.manifestKey, destination.publicBaseUrl).toString(),
+})
+
 export const labelFor = (destination: StudioDestination) =>
   `${destination.artistName} → ${destination.siteHost} → ${destination.section === "movies" ? "Movies" : "Sounds"}`
 
