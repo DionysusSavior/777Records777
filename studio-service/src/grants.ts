@@ -536,6 +536,18 @@ export const createStudioService = (options: {
           // the website's own source, not a product anybody can open in the
           // admin portal, and sending the artist there would waste a trip.
           destination.section === "movies" ? "the site's code" : "the admin portal",
+          /**
+           * What a release's own address is built from.
+           *
+           * Passed rather than assumed, so the rule and the destination it
+           * applies to travel together. The phone is told each address and
+           * computes nothing - see `pageUrl` on CatalogueEntry.
+           */
+          {
+            artistName: destination.artistName,
+            artistPageUrl: destination.pageUrl,
+            manifestUrl: manifestLocationFor(destination).url,
+          },
         ),
       }
     },

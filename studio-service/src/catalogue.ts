@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { PublishedObject } from "../../backend/src/site-manager/core.ts"
-import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
+import { parseSiteManagerManifest, shelfEntriesFrom } from "../../storefront/src/lib/site-manager-manifest.ts"
+import { releaseSlugs } from "../../storefront/src/lib/release-slug.ts"
 
 const PROTOCOL = "om7.site-manager.manifest"
 const VERSION = 1
@@ -286,6 +287,47 @@ export type CatalogueEntry = {
   removable: boolean
   /** Where it IS managed, when it is not managed here. */
   managedBy?: string
+  /**
+   * This release's own page on the website, when the site has one.
+   *
+   * Stated here rather than built by the phone, for the reason `removable` is.
+   * The address is derived from the title by a rule the website also uses, and
+   * a Swift copy of that rule would drift - the first time it did, the phone
+   * would hand somebody a link to a page that is not there. Absent means the
+   * caller should fall back to the page the whole destination points at.
+   */
+  pageUrl?: string
+}
+
+/** What a destination needs to state before a release can have an address. */
+export type PageAddress = {
+  artistName: string
+  /** The destination's own page, e.g. https://site/us/artists/dion */
+  artistPageUrl: string
+  /** Where the manifest is served from, which the parser needs. */
+  manifestUrl: string
+}
+
+/**
+ * The address of every visible release, keyed by release id.
+ *
+ * Computed from the PARSED manifest rather than the raw JSON, through the same
+ * two functions the website renders with. The slug rule settles collisions
+ * across the whole set, so the set has to be identical on both sides - and the
+ * parser drops rows the website would refuse. Reading the raw array here would
+ * mean a refused row still counted towards a collision, and the phone would
+ * state one address while the page served another.
+ */
+const addressesFor = (raw: string, page: PageAddress): Map<string, string> => {
+  const parsed = parseSiteManagerManifest(raw, page.manifestUrl)
+  if (!parsed) return new Map()
+  const releases = shelfEntriesFrom(parsed).flatMap((entry) =>
+    entry.kind === "release" ? [entry.release] : [])
+  const base = page.artistPageUrl.replace(/\/+$/, "")
+  const slugs = releaseSlugs(releases, page.artistName)
+  const addresses = new Map<string, string>()
+  for (const [id, slug] of slugs) addresses.set(id, `${base}/${slug}`)
+  return addresses
 }
 
 const textOf = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null)
@@ -309,7 +351,11 @@ const parseCatalogue = (raw: string) => {
 }
 
 /** What that destination's page is showing. A missing manifest is an empty page, not an error. */
-export const listCatalogue = (raw: string | null, section: "sounds" | "movies"): CatalogueEntry[] => {
+export const listCatalogue = (
+  raw: string | null,
+  section: "sounds" | "movies",
+  page?: PageAddress,
+): CatalogueEntry[] => {
   if (raw === null || raw.trim() === "") return []
   const source = parseCatalogue(raw)
   if (section === "movies") {
@@ -324,6 +370,9 @@ export const listCatalogue = (raw: string | null, section: "sounds" | "movies"):
   }
   const items = (source.items as unknown[]).filter(isRecord)
   if (Array.isArray(source.releases)) {
+    // Movies have no page of their own on the website, so no address is
+    // offered for them rather than one that would 404.
+    const addresses = page && section === "sounds" ? addressesFor(raw, page) : new Map<string, string>()
     return source.releases.flatMap((release) => {
       if (!isRecord(release) || release.visible === false) return []
       const audioId = textOf(release.audio)
@@ -331,7 +380,9 @@ export const listCatalogue = (raw: string | null, section: "sounds" | "movies"):
       const url = audio ? textOf(audio.url) : null
       const title = textOf(release.title)
       const id = textOf(release.id)
-      return url && title && id ? [{ id, title, url, removable: true }] : []
+      if (!url || !title || !id) return []
+      const pageUrl = addresses.get(id)
+      return [pageUrl ? { id, title, url, removable: true, pageUrl } : { id, title, url, removable: true }]
     })
   }
   return items.flatMap((item) => {
@@ -361,8 +412,9 @@ export const pageCatalogue = (
   section: "sounds" | "movies",
   storeItems: readonly { id: string; title: string; url: string }[],
   managedBy: string,
+  page?: PageAddress,
 ): CatalogueEntry[] => {
-  const published = listCatalogue(raw, section)
+  const published = listCatalogue(raw, section, page)
   const seen = new Set(published.map((entry) => entry.url))
   const rest = storeItems.flatMap((item) =>
     seen.has(item.url) ? [] : [{ ...item, removable: false, managedBy }])

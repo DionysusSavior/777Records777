@@ -509,6 +509,164 @@ test("removing a song takes its reel and bundle with it, and leaves a shared art
   assert.deepEqual(listCatalogue(removal.body, "sounds").map((entry) => entry.title), ["rel-b"])
 })
 
+test("the service states each release's own page, and the phone computes nothing", () => {
+  /*
+   WHY THE SERVICE SAYS IT. The address is derived from the title by a rule
+   the website also uses. A Swift copy of that rule would drift, and the first
+   time it did the phone would hand somebody a link to a page that is not
+   there. Same reasoning as `removable`: stated, never guessed.
+
+   The collision below is the part a naive implementation gets wrong. The rule
+   settles a shared title across the WHOLE set, so the service has to look at
+   the same set the website does - which is the PARSED manifest, not the raw
+   array.
+  */
+  const destination = destinationById("dionysus-savior-sounds")
+  assert.ok(destination)
+  const base = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion"
+  const audio = (id: string) => ({
+    id,
+    kind: "audio",
+    title: id,
+    url: `${base}/${id}.wav`,
+    contentType: "audio/wav",
+    bytes: 1,
+    publishedAt: "2026-11-09T00:00:00Z",
+  })
+  // A release's id is its own, never its audio's - ids are unique across the
+  // whole manifest and the parser refuses the document over a duplicate.
+  const release = (id: string, audioId: string, title: string, at: string) => ({
+    id,
+    title,
+    visible: true,
+    audio: audioId,
+    reel: null,
+    artwork: null,
+    bundle: null,
+    price: null,
+    buyUrl: null,
+    publishedAt: at,
+  })
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T00:00:00Z",
+    items: [
+      audio("11111111-1111-4111-8111-111111111111"),
+      audio("22222222-2222-4222-8222-222222222222"),
+    ],
+    releases: [
+      release("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "11111111-1111-4111-8111-111111111111", "DIONYSUS SAVIOR - IN TIME", "2026-10-14T19:52:50Z"),
+      release("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "22222222-2222-4222-8222-222222222222", "In Time", "2026-11-01T00:00:00Z"),
+    ],
+  })
+
+  const entries = pageCatalogue(raw, "sounds", [], "the admin portal", {
+    artistName: destination.artistName,
+    artistPageUrl: destination.pageUrl,
+    manifestUrl: manifestLocationFor(destination).url,
+  })
+
+  const byId = new Map(entries.map((entry) => [entry.id, entry]))
+  // The artist's name is not repeated inside a page already under it, and the
+  // earlier publish keeps the bare address.
+  assert.equal(
+    byId.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")?.pageUrl,
+    "https://777records777.studio/us/artists/dionysus-savior/in-time",
+  )
+  assert.equal(
+    byId.get("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")?.pageUrl,
+    "https://777records777.studio/us/artists/dionysus-savior/in-time-bbbbbb",
+  )
+
+  /*
+   A ROW THE WEBSITE DROPS GETS NO ADDRESS, AND MOVES NOBODY ELSE'S.
+
+   This is the case that makes `addressesFor` read the parsed manifest rather
+   than the raw array. The first release below carries a content type the
+   service accepts and the parser does not, so the website never renders it
+   and it has no page. The service still lists it - the artist should see
+   what is on their shelf either way - but with no `pageUrl`, and the phone
+   falls back to the page link for it.
+
+   The release AFTER it keeps the bare `in-time`, because the website's set
+   contains only one "In Time". Counting the dropped row would have pushed an
+   id suffix onto a release whose page is plainly at /in-time.
+  */
+  const withDropped = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T00:00:00Z",
+    items: [
+      {
+        ...audio("33333333-3333-4333-8333-333333333333"),
+        contentType: "audio/x-aiff",
+        url: `${base}/33333333-3333-4333-8333-333333333333.aiff`,
+      },
+      audio("11111111-1111-4111-8111-111111111111"),
+    ],
+    releases: [
+      release("cccccccc-cccc-4ccc-8ccc-cccccccccccc", "33333333-3333-4333-8333-333333333333", "In Time", "2026-09-01T00:00:00Z"),
+      release("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "11111111-1111-4111-8111-111111111111", "In Time", "2026-10-14T19:52:50Z"),
+    ],
+  })
+  const mixed = pageCatalogue(withDropped, "sounds", [], "the admin portal", {
+    artistName: destination.artistName,
+    artistPageUrl: destination.pageUrl,
+    manifestUrl: manifestLocationFor(destination).url,
+  })
+  const mixedById = new Map(mixed.map((entry) => [entry.id, entry]))
+  assert.equal(mixed.length, 2)
+  assert.equal(mixedById.get("cccccccc-cccc-4ccc-8ccc-cccccccccccc")?.pageUrl, undefined)
+  assert.equal(
+    mixedById.get("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")?.pageUrl,
+    "https://777records777.studio/us/artists/dionysus-savior/in-time",
+  )
+})
+
+test("a commerce row and a film are offered no address rather than a wrong one", () => {
+  /*
+   Only a published RELEASE has a page of its own. A store product's page is
+   the shop's, which this service does not own, and a film has no page at all.
+   Saying nothing sends the phone to the destination's own page, which is
+   true; inventing one would 404 in somebody's feed.
+  */
+  const sounds = destinationById("dionysus-savior-sounds")
+  const movies = destinationById("dionysus-savior-movies")
+  assert.ok(sounds)
+  assert.ok(movies)
+  const page = (destination: typeof sounds) => ({
+    artistName: destination.artistName,
+    artistPageUrl: destination.pageUrl,
+    manifestUrl: manifestLocationFor(destination).url,
+  })
+
+  const withStore = pageCatalogue(null, "sounds", [
+    { id: "prod_1", title: "Gone Crazy", url: "https://777records777.studio/downloads/gone-crazy.wav" },
+  ], "the admin portal", page(sounds))
+  assert.equal(withStore.length, 1)
+  assert.equal(withStore[0]?.pageUrl, undefined)
+  assert.equal(withStore[0]?.removable, false)
+
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T00:00:00Z",
+    items: [],
+    movies: [{
+      id: "33333333-3333-4333-8333-333333333333",
+      title: "Time Machine",
+      url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/33333333-3333-4333-8333-333333333333.mp4",
+      poster: "",
+      bytes: 2,
+      publishedAt: "2026-11-09T00:00:00Z",
+    }],
+  })
+  const films = pageCatalogue(raw, "movies", [], "the site's code", page(movies))
+  assert.equal(films.length, 1)
+  assert.equal(films[0]?.pageUrl, undefined)
+})
+
 test("an item no release ever named is not this removal's to sweep", () => {
   /*
    Restraint, stated as a test.
