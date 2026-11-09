@@ -120,6 +120,19 @@ jobs:
       # `--ignore-scripts` because a typecheck needs no postinstall binaries,
       # and `-w storefront` so this does not drag in Medusa.
       - run: npm install -w storefront --include=dev --no-audit --no-fund --ignore-scripts
+
+      # The WHOLE storefront, not just studio-admin, because this job was green
+      # on a commit that could not build. `next build` typechecks every file
+      # the tsconfig includes - `scripts/` among them - and a spread of a Map
+      # iterator under this project's es5 target broke the Amplify build on
+      # 9 November 2026 while CI reported success. A green tick that does not
+      # mean the site can be deployed is worse than no tick.
+      #
+      # Safe without a build: tsconfig lists `.next/types` under `include` but
+      # `.next` under `exclude`, and exclude wins, so nothing here depends on
+      # generated output.
+      - run: npm run typecheck
+        working-directory: storefront
       - run: npm run typecheck:studio-admin
         working-directory: storefront
 

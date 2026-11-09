@@ -13,6 +13,7 @@
     "start": "next start -p 8000",
     "lint": "next lint",
     "test": "node scripts/test-site-manager-manifest.ts && node scripts/test-release-slug.ts",
+    "typecheck": "tsc --noEmit --pretty false -p tsconfig.json",
     "typecheck:studio-admin": "tsc --noEmit --pretty false -p tsconfig.studio-admin.json",
     "analyze": "ANALYZE=true next build"
   },
