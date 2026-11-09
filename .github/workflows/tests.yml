@@ -123,14 +123,18 @@ jobs:
       - run: npm run typecheck:studio-admin
         working-directory: storefront
 
-  manifest-parser:
-    name: manifest parser
+  pure-libs:
+    name: parser and slugs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '26'
-      # Its own job, with no install step, because the parser and its test
-      # import nothing at all. It still reports when the install above breaks.
+      # Its own job, with no install step, because these modules and their
+      # tests import nothing at all. It still reports when the install above
+      # breaks. The slug rule belongs here for the same reason the parser does:
+      # the publishing service imports it, so a change made for the website
+      # alone has to answer for both.
       - run: node storefront/scripts/test-site-manager-manifest.ts
+      - run: node storefront/scripts/test-release-slug.ts
