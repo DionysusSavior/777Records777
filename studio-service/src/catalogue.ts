@@ -369,16 +369,45 @@ export const pageCatalogue = (
   return [...published, ...rest]
 }
 
+/** Every file a release points at, named once so nothing is swept by half. */
+const partsOf = (release: Record<string, unknown>): string[] =>
+  [release.audio, release.reel, release.artwork, release.bundle]
+    .filter((id): id is string => typeof id === "string")
+
 /**
  * Take one published URL off the page. Does not invent a `releases` array.
- * A Sounds removal also drops any release that used that file. A Movies
- * removal never touches Sounds.
+ * A Sounds removal also drops any release that used that file, AND the other
+ * files that release was the only thing holding on to. A Movies removal never
+ * touches Sounds.
+ *
+ * WHY THE REST OF THE RELEASE GOES TOO. A release is a song with its reel,
+ * its artwork and its downloadable bundle. Removing it used to drop the
+ * release and the one named file, leaving the other three in `items` - where
+ * nothing can reach them, because `listCatalogue` lists RELEASES for sounds,
+ * not items. The phone showed no row, the page showed no row, and the bytes
+ * stayed in the artist's bucket for good. One publish-then-remove of a song
+ * with a bundle left 213 KB behind on 9 November 2026, which is how this was
+ * found. For a product whose whole claim is that the files are the artist's
+ * and under their control, a file they cannot see or delete is the wrong kind
+ * of permanent.
+ *
+ * SHARED FILES ARE NOT STRANDED. One artwork used by two releases survives
+ * the removal of either, because `stillUsed` is computed from the releases
+ * that remain. Only what nothing else points at is taken.
+ *
+ * ITEMS NO RELEASE EVER NAMED ARE LEFT ALONE. They may be orphans from an
+ * older failure, but they are not THIS removal's to judge, and sweeping files
+ * nobody asked about is how a delete becomes something to fear.
+ *
+ * The URLs come back rather than being deleted here, because this function
+ * only ever rewrites a document. The caller holds the S3 grant and has
+ * already proved that each key sits inside its own prefix.
  */
 export const removeFromCatalogue = (
   raw: string,
   target: { url: string; section: "sounds" | "movies" },
   updatedAt: string,
-) => {
+): { body: string; orphaned: string[] } => {
   const source = parseCatalogue(raw)
   if (target.section === "movies") {
     const movies = Array.isArray(source.movies) ? source.movies.filter(isRecord) : []
@@ -388,7 +417,7 @@ export const removeFromCatalogue = (
     }
     source.movies = next
     source.updatedAt = updatedAt
-    return JSON.stringify(source)
+    return { body: JSON.stringify(source), orphaned: [] }
   }
   const items = (source.items as unknown[]).filter(isRecord)
   const removed = items.filter((item) => item.url === target.url)
@@ -396,16 +425,30 @@ export const removeFromCatalogue = (
     throw new CatalogueError(404, "not_found", "That file is not on this page.")
   }
   const removedIds = new Set(removed.map((item) => item.id))
-  source.items = items.filter((item) => item.url !== target.url)
+  let kept = items.filter((item) => item.url !== target.url)
+  const orphaned: string[] = []
+
   if (Array.isArray(source.releases)) {
-    source.releases = source.releases.filter((release) => {
-      if (!isRecord(release)) return false
-      const ids = [release.audio, release.reel, release.artwork, release.bundle]
-      return !ids.some((id) => typeof id === "string" && removedIds.has(id))
+    const releases = source.releases.filter(isRecord)
+    const surviving = releases.filter((release) => !partsOf(release).some((id) => removedIds.has(id)))
+    const dropped = releases.filter((release) => partsOf(release).some((id) => removedIds.has(id)))
+    const stillUsed = new Set(surviving.flatMap(partsOf))
+    const stranded = new Set(
+      dropped.flatMap(partsOf).filter((id) => !removedIds.has(id) && !stillUsed.has(id)),
+    )
+    source.releases = surviving
+    kept = kept.filter((item) => {
+      const id = textOf(item.id)
+      if (id === null || !stranded.has(id)) return true
+      const url = textOf(item.url)
+      if (url !== null) orphaned.push(url)
+      return false
     })
   }
+
+  source.items = kept
   source.updatedAt = updatedAt
-  return JSON.stringify(source)
+  return { body: JSON.stringify(source), orphaned }
 }
 
 /**
@@ -467,10 +510,10 @@ export const commitRemoval = async (
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const current = await store.read(manifest.key)
     if (!current) throw new CatalogueError(404, "not_found", "That file is not on this page.")
-    const body = removeFromCatalogue(current.body, target, updatedAt)
+    const { body, orphaned } = removeFromCatalogue(current.body, target, updatedAt)
     refuseUnreadable(manifest, current.body, body)
     const written = await store.write(manifest.key, body, current.etag)
-    if ("etag" in written) return
+    if ("etag" in written) return orphaned
   }
   throw new CatalogueError(409, "catalogue_conflict", "The page changed while that file was being removed. Try again.")
 }

@@ -429,10 +429,111 @@ test("a sound can be listed and removed without touching movies or inventing rel
   assert.ok(destination)
   assert.equal(objectKeyFor(destination, url), "site-manager/viz/11111111-1111-4111-8111-111111111111.mp3")
   assert.equal(objectKeyFor(destination, "https://example.test/other.mp3"), null)
-  const next = JSON.parse(removeFromCatalogue(raw, { url, section: "sounds" }, "2026-10-28T01:00:00.000Z"))
+  const removal = removeFromCatalogue(raw, { url, section: "sounds" }, "2026-10-28T01:00:00.000Z")
+  const next = JSON.parse(removal.body)
   assert.equal(next.items.length, 0)
   assert.equal(next.releases, undefined)
   assert.equal(next.movies.length, 1)
+  // No `releases` array means nothing was holding other files together, so
+  // there is nothing stranded to report.
+  assert.deepEqual(removal.orphaned, [])
+})
+
+test("removing a song takes its reel and bundle with it, and leaves a shared artwork alone", () => {
+  /*
+   What a release is on the way out.
+
+   A release is a song WITH its reel, its artwork and its downloadable bundle.
+   Removal used to drop the release and the one named file and leave the other
+   three in `items`, where nothing could reach them: `listCatalogue` lists
+   releases for sounds, not items, so neither the phone nor the page showed a
+   row, and the bytes stayed in the artist's bucket permanently. Found on
+   9 November 2026 when one publish-then-remove left a 213 KB .om7 behind.
+
+   The artwork here is deliberately shared with a second release, because the
+   obvious fix - delete everything the dropped release named - would take an
+   image that is still on the page out from under it.
+  */
+  const base = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz"
+  const item = (id: string, kind: string, ext: string, contentType: string) => ({
+    id,
+    kind,
+    title: id,
+    url: `${base}/${id}.${ext}`,
+    contentType,
+    bytes: 1,
+    publishedAt: "2026-11-09T00:00:00.000Z",
+  })
+  const release = (id: string, parts: Record<string, string | null>) => ({
+    id,
+    title: id,
+    visible: true,
+    audio: null,
+    reel: null,
+    artwork: null,
+    bundle: null,
+    price: null,
+    buyUrl: null,
+    publishedAt: "2026-11-09T00:00:00.000Z",
+    ...parts,
+  })
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T00:00:00.000Z",
+    items: [
+      item("song-a", "audio", "wav", "audio/wav"),
+      item("reel-a", "video", "mp4", "video/mp4"),
+      item("shared-art", "image", "png", "image/png"),
+      item("bundle-a", "bundle", "om7", "application/octet-stream"),
+      item("song-b", "audio", "wav", "audio/wav"),
+      item("loose", "audio", "wav", "audio/wav"),
+    ],
+    releases: [
+      release("rel-a", { audio: "song-a", reel: "reel-a", artwork: "shared-art", bundle: "bundle-a" }),
+      release("rel-b", { audio: "song-b", artwork: "shared-art" }),
+    ],
+  })
+
+  const removal = removeFromCatalogue(raw, { url: `${base}/song-a.wav`, section: "sounds" }, "2026-11-09T01:00:00.000Z")
+  const next = JSON.parse(removal.body)
+
+  assert.deepEqual(next.releases.map((entry: { id: string }) => entry.id), ["rel-b"])
+  assert.deepEqual(
+    next.items.map((entry: { id: string }) => entry.id).sort(),
+    ["loose", "shared-art", "song-b"].sort(),
+  )
+  assert.deepEqual(removal.orphaned.sort(), [`${base}/bundle-a.om7`, `${base}/reel-a.mp4`])
+
+  // The page still reads, and still shows the release that survived.
+  assert.deepEqual(listCatalogue(removal.body, "sounds").map((entry) => entry.title), ["rel-b"])
+})
+
+test("an item no release ever named is not this removal's to sweep", () => {
+  /*
+   Restraint, stated as a test.
+
+   A loose item may well be an orphan from an older failure, but it is not
+   THIS removal's to judge. Sweeping files nobody asked about is how a delete
+   becomes something an artist is afraid to press.
+  */
+  const base = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz"
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T00:00:00.000Z",
+    items: [
+      { id: "song", kind: "audio", title: "Song", url: `${base}/song.wav`, contentType: "audio/wav", bytes: 1, publishedAt: "2026-11-09T00:00:00.000Z" },
+      { id: "stray", kind: "bundle", title: "Stray", url: `${base}/stray.om7`, contentType: "application/octet-stream", bytes: 1, publishedAt: "2026-11-09T00:00:00.000Z" },
+    ],
+    releases: [
+      { id: "rel", title: "Song", visible: true, audio: "song", reel: null, artwork: null, bundle: null, price: null, buyUrl: null, publishedAt: "2026-11-09T00:00:00.000Z" },
+    ],
+  })
+
+  const removal = removeFromCatalogue(raw, { url: `${base}/song.wav`, section: "sounds" }, "2026-11-09T01:00:00.000Z")
+  assert.deepEqual(removal.orphaned, [])
+  assert.deepEqual(JSON.parse(removal.body).items.map((entry: { id: string }) => entry.id), ["stray"])
 })
 
 test("an orphan can be removed, and removing nothing is still a 404", async () => {

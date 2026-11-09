@@ -568,8 +568,9 @@ export const createStudioService = (options: {
        * is the same check the entry path relies on.
        */
       let listed = true
+      let orphaned: string[] = []
       try {
-        await commitRemoval(
+        orphaned = await commitRemoval(
           options.manifests,
           manifestLocationFor(destination),
           { url, section: destination.section },
@@ -589,6 +590,34 @@ export const createStudioService = (options: {
       if (stored && options.deleteObject) {
         await options.deleteObject(key)
       }
+
+      /**
+       * The rest of the release follows its entry out of the bucket.
+       *
+       * `commitRemoval` has already taken these out of the manifest, so the
+       * page is correct either way; what is left here is the bytes. Each URL
+       * is put back through `objectKeyFor`, which is the same proof the named
+       * file had to pass - a manifest row naming some other host buys nothing
+       * and is skipped rather than refused.
+       *
+       * BEST EFFORT, DELIBERATELY. The manifest write has already succeeded by
+       * the time this runs. Failing the call here would tell an artist that a
+       * removal they watched happen did not, and send them to retry something
+       * that would then answer 404. A delete that does not land leaves exactly
+       * what the old code left every time, so this can only improve on it.
+       */
+      for (const strandedUrl of orphaned) {
+        const strandedKey = objectKeyFor(destination, strandedUrl)
+        if (!strandedKey || strandedKey === key || !options.deleteObject) continue
+        try {
+          if (await options.storage.inspectUpload(strandedKey)) {
+            await options.deleteObject(strandedKey)
+          }
+        } catch {
+          // Nothing to do here that the next publish will not do better.
+        }
+      }
+
       if (!listed && !stored) {
         throw new CatalogueError(404, "not_found", "That file is not on this page.")
       }
