@@ -54,7 +54,7 @@ check("array order never decides an address", () => {
   const two = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", title: "In Time" }
   const forwards = releaseSlugs([one, two], ARTIST)
   const backwards = releaseSlugs([two, one], ARTIST)
-  assert.deepEqual([...forwards.entries()].sort(), [...backwards.entries()].sort())
+  assert.deepEqual(Array.from(forwards.entries()).sort(), Array.from(backwards.entries()).sort())
 })
 
 check("a title with no letters at all still gets an address", () => {

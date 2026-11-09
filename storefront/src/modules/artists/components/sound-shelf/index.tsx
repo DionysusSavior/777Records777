@@ -172,7 +172,17 @@ function itemById(
   return id ? items.find((item) => item.id === id) : undefined
 }
 
-function ManifestRelease({
+/**
+ * One release, exported so the single-release page draws the same thing.
+ *
+ * Which file is the download, whether a bundle is offered beside it, and
+ * whether a priced release shows Buy instead of a free copy of the same file
+ * are all decided here. A second implementation of those rules on the release
+ * page would drift, and the first time it did the two pages would disagree
+ * about the same song - one offering a free download beside the other's Buy
+ * button.
+ */
+export function ManifestRelease({
   release,
   items,
 }: {

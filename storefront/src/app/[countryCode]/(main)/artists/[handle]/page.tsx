@@ -21,13 +21,31 @@ type Props = {
 // page then fails with DYNAMIC_SERVER_USAGE. It renders per request like every
 // other route in this app.
 
+/**
+ * The preview card this page never had.
+ *
+ * Only `title` and `description` were set, so every link to an artist posted
+ * anywhere has shown whatever the root layout supplies. The artist's own
+ * photograph is already on this page and is the obvious thing for a reader to
+ * recognise in a feed. A single release states its own card instead - see the
+ * [slug] route beside this one.
+ */
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { handle } = await props.params
   const artist = getArtist(handle)
   if (!artist) return { title: "777Records777 Studio" }
+  const title = `${artist.name} | 777Records777 Studio`
+  const description = `${artist.name} — ${artist.tagline}.`
   return {
-    title: `${artist.name} | 777Records777 Studio`,
-    description: `${artist.name} — ${artist.tagline}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      images: [{ url: artist.photo }],
+    },
+    twitter: { card: "summary_large_image", title, description, images: [artist.photo] },
   }
 }
 
