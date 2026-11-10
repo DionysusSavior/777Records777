@@ -222,10 +222,12 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
      page, beside the audio it belongs behind, and no player could ever know
      they were the same release.
 
-     The id arrives inside the signed receipt, so a caller cannot name a
-     release that is not theirs to add to. An id that matches nothing here
-     starts a release under that id rather than a random one, which is what
-     makes the order of the four uploads stop mattering.
+     The id arrives inside the signed receipt. The signature pins the
+     caller's choice; it does not prove they created that release. Anyone
+     who can publish to this destination can name an existing release id
+     and attach a file to it. An id that matches nothing here starts a
+     release under that id rather than a random one, which is what makes
+     the order of the four uploads stop mattering.
     */
     const existing = role === null ? -1 : published.releaseId
       ? source.releases.findIndex((r) => isRecord(r) && r.id === published.releaseId)
@@ -376,8 +378,20 @@ export const listCatalogue = (
     return source.releases.flatMap((release) => {
       if (!isRecord(release) || release.visible === false) return []
       const audioId = textOf(release.audio)
-      const audio = items.find((item) => item.id === audioId && item.kind === "audio")
-      const url = audio ? textOf(audio.url) : null
+      let url: string | null = null
+      if (audioId) {
+        const audio = items.find((item) => item.id === audioId && item.kind === "audio")
+        url = audio ? textOf(audio.url) : null
+      } else {
+        // A photo with a price and nothing to play. Listing only the audio
+        // made that release invisible, so the phone could neither show it
+        // nor remove it.
+        const artworkId = textOf(release.artwork)
+        const artwork = artworkId
+          ? items.find((item) => item.id === artworkId && item.kind === "image")
+          : undefined
+        url = artwork ? textOf(artwork.url) : null
+      }
       const title = textOf(release.title)
       const id = textOf(release.id)
       if (!url || !title || !id) return []
@@ -551,6 +565,88 @@ const refuseUnreadable = (manifest: ManifestLocation, prior: string | null, next
     "catalogue_unreadable",
     "The page was left as it was, because this change would have hidden everything on it.",
   )
+}
+
+const MAX_PRICE_CENTS = 1_000_000_000
+const MAX_BUY_URL_CHARS = 500
+
+const httpsBuyUrl = (value: string): boolean => {
+  if (value.length === 0 || value.length > MAX_BUY_URL_CHARS) return false
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return false
+  }
+  return url.protocol === "https:" && url.username === "" && url.password === "" && url.host !== ""
+}
+
+/**
+ * Set or clear the price on a release that already exists.
+ *
+ * Not an upload. A price carried inside a receipt would be applied whenever
+ * that receipt completed, including hours later, and would overwrite a newer
+ * price. This write uses the manifest's current etag, and a file completion
+ * spreads the release it read, so it keeps a price it did not set.
+ *
+ * A missing key leaves the stored value. Null clears it. A price and a link
+ * stay paired: both set, or both empty.
+ */
+export const applySale = (
+  raw: string,
+  releaseId: string,
+  patch: { price?: number | null; buyUrl?: string | null },
+  present: { price: boolean; buyUrl: boolean },
+  updatedAt: string,
+) => {
+  const source = parseCatalogue(raw)
+  if (!Array.isArray(source.releases)) {
+    throw new CatalogueError(404, "not_found", "That release is not on this page.")
+  }
+  const index = source.releases.findIndex((release) => isRecord(release) && release.id === releaseId)
+  if (index < 0) throw new CatalogueError(404, "not_found", "That release is not on this page.")
+  const release = { ...(source.releases[index] as Record<string, unknown>) }
+  const storedPrice = release.price === null || typeof release.price === "number" ? release.price : null
+  const storedBuy = release.buyUrl === null || typeof release.buyUrl === "string" ? release.buyUrl : null
+  const price = present.price ? patch.price ?? null : storedPrice
+  const buyUrl = present.buyUrl ? patch.buyUrl ?? null : storedBuy
+  if (price !== null && (!Number.isSafeInteger(price) || price < 1 || price > MAX_PRICE_CENTS)) {
+    throw new CatalogueError(400, "invalid_request", "Name a price in cents, or clear it.")
+  }
+  if (buyUrl !== null && !httpsBuyUrl(buyUrl)) {
+    throw new CatalogueError(400, "invalid_request", "The buy link has to be https, with no name or password in it.")
+  }
+  if ((price === null) !== (buyUrl === null)) {
+    throw new CatalogueError(400, "invalid_request", "A price and a buy link travel together, or not at all.")
+  }
+  if (price === storedPrice && buyUrl === storedBuy) {
+    return { body: raw, unchanged: true }
+  }
+  release.price = price
+  release.buyUrl = buyUrl
+  source.releases = source.releases.map((item, at) => at === index ? release : item)
+  source.updatedAt = updatedAt
+  return { body: JSON.stringify(source), unchanged: false }
+}
+
+export const commitSale = async (
+  store: ManifestStore,
+  manifest: ManifestLocation,
+  releaseId: string,
+  patch: { price?: number | null; buyUrl?: string | null },
+  present: { price: boolean; buyUrl: boolean },
+  updatedAt: string,
+) => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const current = await store.read(manifest.key)
+    if (!current) throw new CatalogueError(404, "not_found", "That release is not on this page.")
+    const next = applySale(current.body, releaseId, patch, present, updatedAt)
+    if (next.unchanged) return
+    refuseUnreadable(manifest, current.body, next.body)
+    const written = await store.write(manifest.key, next.body, current.etag)
+    if ("etag" in written) return
+  }
+  throw new CatalogueError(409, "catalogue_conflict", "The page changed while that price was being saved. Try again.")
 }
 
 export const commitRemoval = async (

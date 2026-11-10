@@ -165,6 +165,14 @@ export const handle = async (
         url.searchParams.get("destinationId"),
       ), cors)
     }
+    if (request.method === "POST" && path === "/catalogue/sale") {
+      const body = await readJson(request)
+      destinationId = asDestinationId(body.destinationId) ?? destinationId
+      return json(200, await deps.service.updateSale(
+        request.headers.get("authorization") ?? undefined,
+        body,
+      ), cors)
+    }
     if (request.method === "POST" && path === "/catalogue/remove") {
       const body = await readJson(request)
       destinationId = asDestinationId(body.destinationId) ?? destinationId

@@ -5,7 +5,7 @@ import {
   type PublishStorage,
   type PublishedObject,
 } from "../../backend/src/site-manager/core.ts"
-import { CatalogueError, commitCatalogue, commitRemoval, pageCatalogue, type ManifestStore } from "./catalogue.ts"
+import { CatalogueError, commitCatalogue, commitRemoval, commitSale, pageCatalogue, type ManifestStore } from "./catalogue.ts"
 import {
   DESTINATIONS,
   UPLOAD_TTL_SECONDS,
@@ -550,6 +550,46 @@ export const createStudioService = (options: {
           },
         ),
       }
+    },
+    /**
+     * A destination grant may set the price. An administrator login may not:
+     * administration does not publish, and this is a publish to the page.
+     * The etag check lives in commitSale, so an upload that finishes after
+     * this read cannot write the old price back.
+     */
+    async updateSale(authorization: string | undefined, body: Record<string, unknown>) {
+      const scope = await resolveGrant(authorization, body.destinationId)
+      const destination = destinationById(scope.destinationId)
+      if (!destination) {
+        throw new SiteManagerError(403, "destination_denied", "That is not a publishing destination on this site.")
+      }
+      if (typeof body.releaseId !== "string" || body.releaseId.length === 0) {
+        throw new SiteManagerError(400, "invalid_request", "Name the release.")
+      }
+      const present = { price: "price" in body, buyUrl: "buyUrl" in body }
+      if (!present.price && !present.buyUrl) {
+        throw new SiteManagerError(400, "invalid_request", "Name the price, or clear it.")
+      }
+      const price = body.price
+      const buyUrl = body.buyUrl
+      if (present.price && price !== null && typeof price !== "number") {
+        throw new SiteManagerError(400, "invalid_request", "Name a price in cents, or clear it.")
+      }
+      if (present.buyUrl && buyUrl !== null && typeof buyUrl !== "string") {
+        throw new SiteManagerError(400, "invalid_request", "The buy link has to be https, with no name or password in it.")
+      }
+      await commitSale(
+        options.manifests,
+        manifestLocationFor(destination),
+        body.releaseId,
+        {
+          price: present.price ? (price as number | null) : undefined,
+          buyUrl: present.buyUrl ? (buyUrl as string | null) : undefined,
+        },
+        present,
+        new Date(now()).toISOString(),
+      )
+      return { updated: true }
     },
     async removePublished(authorization: string | undefined, destinationId: unknown, url: unknown) {
       if (typeof url !== "string") {

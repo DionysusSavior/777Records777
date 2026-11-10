@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
 import { CONTENT_TYPES, canonicalContentType, type PublishStorage, type StoredUpload, type UploadDescriptor } from "../../backend/src/site-manager/core.ts"
-import { applyCatalogue, commitCatalogue, commitRemoval, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { applyCatalogue, applySale, commitCatalogue, commitRemoval, commitSale, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
 import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
 import { destinationById, manifestLocationFor, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
@@ -1273,4 +1273,59 @@ test("a broken page can be repaired one removal at a time", async () => {
     parseSiteManagerManifest(repaired!, VIZ_MANIFEST.url),
     "the page is readable again once the bad rows are gone",
   )
+})
+
+test("a photo with a price is listed and removed, and a later upload keeps the price", async () => {
+  const artId = "c4d2e3f5-6071-490b-bccd-def012345678"
+  const releaseId = "f7a8b9c0-d1e2-4f30-8a4b-5c6d7e8f9012"
+  const artUrl = `https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/${artId}.jpg`
+  const raw = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    updatedAt: "2026-11-09T12:00:00.000Z",
+    items: [{
+      id: artId, kind: "image", title: "Tour Tee", url: artUrl,
+      contentType: "image/jpeg", bytes: 220000, publishedAt: "2026-11-09T12:00:00.000Z",
+    }],
+    releases: [{
+      id: releaseId, title: "Tour Tee - Black", audio: null, reel: null,
+      artwork: artId, bundle: null, price: null, buyUrl: null, visible: true,
+      publishedAt: "2026-11-09T12:00:00.000Z",
+    }],
+  })
+  const listed = listCatalogue(raw, "sounds")
+  assert.equal(listed.length, 1, "a photo with nothing to play still has to list")
+  assert.equal(listed[0]?.url, artUrl)
+
+  const priced = applySale(raw, releaseId, { price: 3500, buyUrl: "https://buy.stripe.com/test_tee" }, { price: true, buyUrl: true }, "2026-11-09T13:00:00.000Z")
+  const afterSale = JSON.parse(priced.body)
+  assert.equal(afterSale.releases[0].price, 3500)
+
+  const audioId = "33333333-3333-4333-8333-333333333333"
+  const uploaded = applyCatalogue(priced.body, {
+    key: `site-manager/viz/${audioId}.mp3`,
+    publicUrl: `https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/${audioId}.mp3`,
+    mediaKind: "audio",
+    contentType: "audio/mpeg",
+    contentLength: 2048,
+    checksumSha256: checksum,
+    downloadName: "tee.mp3",
+    title: "In Time",
+    destinationId: "viz-sounds",
+    section: "sounds",
+    releaseId,
+  }, "2026-11-09T14:00:00.000Z").body
+  const afterUpload = JSON.parse(uploaded)
+  assert.equal(afterUpload.releases[0].price, 3500, "the upload wrote over the price")
+  assert.equal(afterUpload.releases[0].buyUrl, "https://buy.stripe.com/test_tee")
+  assert.equal(afterUpload.releases[0].title, "In Time")
+
+  const removed = removeFromCatalogue(priced.body, { url: artUrl, section: "sounds" }, "2026-11-09T15:00:00.000Z")
+  assert.equal(JSON.parse(removed.body).releases.length, 0)
+  assert.equal(listCatalogue(removed.body, "sounds").length, 0)
+
+  const store = manifests()
+  await store.write(VIZ_MANIFEST.key, raw, null)
+  await commitSale(store, VIZ_MANIFEST, releaseId, { price: null, buyUrl: null }, { price: true, buyUrl: true }, "2026-11-09T16:00:00.000Z")
+  assert.equal(JSON.parse(store.snapshot(VIZ_MANIFEST.key) ?? "{}").releases[0].price, null)
 })
