@@ -217,6 +217,13 @@ export const createStudioService = (options: {
   mintToken?: () => string
   sendInvite?: (message: { to: string; acceptUrl: string; label: string }) => Promise<void>
   deleteObject?: (key: string) => Promise<void>
+  /**
+   * An OM7 assertion, already checked for signature, audience, and lifetime.
+   * Null when the bearer is not an assertion. The grant check below is what
+   * makes revocation immediate: a still-unexpired assertion whose account was
+   * removed from this destination publishes nothing.
+   */
+  readAssertion?: (token: string) => Promise<{ sub: string; host: string } | null>
 }) => {
   const now = options.now ?? Date.now
   const freshnessMs = options.freshnessMs ?? GRANT_FRESHNESS_MS
@@ -292,6 +299,27 @@ export const createStudioService = (options: {
     const token = bearer(authorization)
     if (!token) {
       throw new SiteManagerError(401, "unauthorized", "The publishing credential is not valid.")
+    }
+    if (options.readAssertion && token.split(".").length === 3) {
+      const assertion = await options.readAssertion(token)
+      if (assertion) {
+        if (assertion.host !== destination.siteHost) {
+          throw new SiteManagerError(403, "destination_denied", "That domain is not this destination.")
+        }
+        const grant = (await options.store.listGrants()).find((item) =>
+          item.principalSub === assertion.sub && item.destinationId === destination.id && item.revokedAt === null)
+        if (!grant) {
+          throw new SiteManagerError(403, "destination_denied", "This account is not invited to that destination.")
+        }
+        return {
+          keyPrefix: destination.prefix,
+          publicBaseUrl: destination.publicBaseUrl,
+          destinationId: destination.id,
+          grantId: grant.id,
+          grantVersion: grant.version,
+          section: destination.section,
+        }
+      }
     }
     const tokenSha256 = hashToken(token)
     const hit = cache.get(tokenSha256)

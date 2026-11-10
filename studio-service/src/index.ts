@@ -1,13 +1,15 @@
 import { createAdminService } from "./admins.ts"
 import { dynamoAdminStore } from "./admin-store.ts"
-import { createPublicKey, type KeyObject } from "node:crypto"
+import { createPublicKey, type JsonWebKey, type KeyObject } from "node:crypto"
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager"
 import { S3PublishStorage } from "../../backend/src/site-manager/s3-adapter.ts"
 import { DESTINATIONS } from "./destinations.ts"
 import { handle, type HandlerDeps } from "./handler.ts"
 import { IdentityError, verifyIdToken } from "./identity.ts"
+import { verifyPublishAssertion } from "./assertion.ts"
 import { createStudioService, memoryGrantStore } from "./grants.ts"
+import { SiteManagerError } from "../../backend/src/site-manager/core.ts"
 import { dynamoGrantStore, s3ManifestStore } from "./aws.ts"
 import { sendStudioInvite } from "./mail.ts"
 
@@ -35,6 +37,25 @@ export const acceptReceiptSecret = (value: string | undefined) => {
 }
 
 const secrets = new SecretsManagerClient({})
+let publishKeys: { at: number; body: { keys?: JsonWebKey[] } } | null = null
+
+/** Signature and audience only. The grant check stays in the service. */
+const readPublishAssertion = async (token: string) => {
+  const url = process.env.OM7_PUBLISH_KEYS_URL?.trim()
+  const audience = process.env.STUDIO_PUBLIC_ORIGIN?.trim()
+  if (!url || !audience) return null
+  const now = Date.now()
+  if (!publishKeys || now - publishKeys.at > 60_000) {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error("The publishing keys could not be read.")
+    publishKeys = { at: now, body: await response.json() as { keys?: JsonWebKey[] } }
+  }
+  try {
+    return verifyPublishAssertion(token, publishKeys.body, { audience, now })
+  } catch {
+    throw new SiteManagerError(401, "unauthorized", "The publishing assertion is not valid.")
+  }
+}
 let warm: { id: string; deps: HandlerDeps } | null = null
 
 const depsFor = (receiptSecret: string): HandlerDeps => {
@@ -51,6 +72,7 @@ const depsFor = (receiptSecret: string): HandlerDeps => {
     }),
     receiptSecret,
     admins,
+    readAssertion: readPublishAssertion,
     authorizeAdmin: people.authorize,
     sendInvite: process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined,
     deleteObject: async (key) => {

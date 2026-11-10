@@ -1,11 +1,12 @@
 import assert from "node:assert/strict"
-import { createHash, generateKeyPairSync, sign } from "node:crypto"
+import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
 import { CONTENT_TYPES, canonicalContentType, type PublishStorage, type StoredUpload, type UploadDescriptor } from "../../backend/src/site-manager/core.ts"
 import { applyCatalogue, applySale, commitCatalogue, commitRemoval, commitSale, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
 import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
 import { destinationById, manifestLocationFor, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
+import { verifyPublishAssertion } from "../src/assertion.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
 import { handle } from "../src/handler.ts"
 import { IdentityError, verifyIdToken } from "../src/identity.ts"
@@ -1328,4 +1329,39 @@ test("a photo with a price is listed and removed, and a later upload keeps the p
   await store.write(VIZ_MANIFEST.key, raw, null)
   await commitSale(store, VIZ_MANIFEST, releaseId, { price: null, buyUrl: null }, { price: true, buyUrl: true }, "2026-11-09T16:00:00.000Z")
   assert.equal(JSON.parse(store.snapshot(VIZ_MANIFEST.key) ?? "{}").releases[0].price, null)
+})
+
+test("an assertion publishes for an invited account and stops when the grant is revoked", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" })
+  const jwk = { ...publicKey.export({ format: "jwk" }), alg: "ES256", use: "sig", kid: "om7-publish-1" }
+  const pem = privateKey.export({ type: "pkcs8", format: "pem" })
+  const now = Date.parse("2026-11-10T16:00:00Z")
+  const iat = Math.floor(now / 1000)
+  const header = Buffer.from(JSON.stringify({ alg: "ES256", typ: "om7-assertion", kid: "om7-publish-1" })).toString("base64url")
+  const payload = Buffer.from(JSON.stringify({
+    iss: "https://om7.foundation", sub: VIZ, aud: "https://publish.777records777.studio",
+    host: "777records777.studio", iat, exp: iat + 600, jti: "fixed",
+  })).toString("base64url")
+  const signature = sign("sha256", Buffer.from(`${header}.${payload}`), {
+    key: createPrivateKey(pem), dsaEncoding: "ieee-p1363",
+  }).toString("base64url")
+  const assertion = `${header}.${payload}.${signature}`
+  const readAssertion = async (token: string) => verifyPublishAssertion(token, { keys: [jwk] }, {
+    audience: "https://publish.777records777.studio", now,
+  })
+  const files = storage()
+  const service = createStudioService({
+    store: memoryGrantStore(),
+    manifests: manifests(),
+    storage: files.fake,
+    receiptSecret: "test-only-receipt-secret-that-is-long-enough",
+    admins: new Set([ADMIN]),
+    readAssertion,
+  })
+  const invite = await service.createInvite(person(ADMIN), { destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL })
+  const accepted = await service.acceptInvite(person(VIZ, VIZ_EMAIL), invite.inviteId)
+  const begun = await service.begin(`Bearer ${assertion}`, audio("viz-sounds"))
+  assert.ok(begun.uploadReceipt)
+  await service.revoke(person(ADMIN), accepted.grantId)
+  await assert.rejects(() => service.begin(`Bearer ${assertion}`, audio("viz-sounds")), /not invited/)
 })
