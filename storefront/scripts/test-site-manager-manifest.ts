@@ -234,6 +234,69 @@ check("a release with a broken price is dropped, and the writer still refuses it
   }
 })
 
+// What the app's "Item for sale" kind writes: one photo, nothing to play, and
+// a price that is not optional. The protocol always allowed this - parseRelease
+// asks for one attached file, it does not ask for audio - so these checks are
+// what keeps that true. The priced-release check above does not prove it,
+// because that release has all four roles filled.
+const itemForSale = {
+  id: "f7a8b9c0-d1e2-4f30-8a4b-5c6d7e8f9012",
+  title: "Tour Tee - Black",
+  audio: null,
+  reel: null,
+  artwork: artItem.id,
+  bundle: null,
+  price: 3500,
+  buyUrl: "https://buy.stripe.com/test_tee",
+  visible: true,
+  publishedAt: "2026-11-09T12:00:00Z",
+}
+
+check("an item for sale is a release with a photo, a price and nothing to play", () => {
+  const parsed = parseSiteManagerManifest(manifest({
+    items: [artItem],
+    releases: [itemForSale],
+  }), manifestUrl)
+  assert(parsed)
+  assert.equal(parsed.releases?.length, 1)
+  const release = parsed.releases![0]
+  assert.equal(release.audio, null)
+  assert.equal(release.reel, null)
+  assert.equal(release.bundle, null)
+  assert.equal(release.artwork, artItem.id)
+  assert.equal(release.price, 3500)
+  assert.equal(release.buyUrl, "https://buy.stripe.com/test_tee")
+
+  // Parsing is not enough. A release the shelf drops is invisible however well
+  // it parsed, and the photo has to travel with it or there is nothing to draw.
+  const shown = shelfEntriesFrom(parsed)
+  assert.equal(shown.length, 1)
+  const entry = shown[0]
+  assert(entry.kind === "release")
+  assert.deepEqual(entry.items.map((item) => item.id), [artItem.id])
+})
+
+check("a half-filled item is dropped in silence, which is why the app refuses it first", () => {
+  // Each of these is a thing the artist meant to sell and cannot: no link to
+  // pay at, no stated price, or no photo to sell. The parser DROPS the release
+  // rather than refusing the manifest, so the page still renders and the item
+  // simply is not on it - nothing downstream ever tells the artist it vanished.
+  // That silence is why OM7PublishView gates price, link and photo on the
+  // phone, before anything is written.
+  for (const bad of [
+    { ...itemForSale, buyUrl: null },
+    { ...itemForSale, price: null },
+    { ...itemForSale, artwork: null },
+  ]) {
+    const shownManifest = manifest({ items: [artItem], releases: [bad] })
+    const parsed = parseSiteManagerManifest(shownManifest, manifestUrl)
+    assert(parsed)
+    assert.deepEqual(parsed.releases, [])
+    assert.deepEqual(shelfEntriesFrom(parsed), [])
+    assert.equal(parseSiteManagerManifest(shownManifest, manifestUrl, "store"), null)
+  }
+})
+
 check("the shelf hides invisible releases and does not invent them from items", () => {
   const stage1 = parseSiteManagerManifest(manifest(), manifestUrl)!
   assert.equal(shelfEntriesFrom(stage1).length, 1)
