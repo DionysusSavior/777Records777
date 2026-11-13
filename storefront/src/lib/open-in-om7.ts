@@ -1,4 +1,4 @@
-import { getArtist } from "./artists.ts"
+import { ARTISTS, getArtist } from "./artists.ts"
 
 /**
  * A release, opened in OM7Player instead of saved by the browser.
@@ -25,42 +25,55 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 /** A plain host: labels, dots, no port, no path, no credentials. */
 const HOST = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i
 
-export const openInOm7Href = (domain: string, releaseId: string): string | null => {
+/** A roster handle. The link may name one, and nothing else about the artist. */
+const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+
+export const openInOm7Href = (
+  domain: string,
+  releaseId: string,
+  handle?: string
+): string | null => {
   if (!HOST.test(domain) || !UUID.test(releaseId)) return null
+  const artist = handle?.toLowerCase()
+  if (artist !== undefined && !HANDLE.test(artist)) return null
   const url = new URL(OM7_OPEN_ENDPOINT)
   url.searchParams.set("d", domain.toLowerCase())
   url.searchParams.set("r", releaseId.toLowerCase())
+  if (artist) url.searchParams.set("a", artist)
   return url.toString()
 }
 
 /**
- * The one manifest this site's discovery document names.
+ * Every manifest this site will admit to, keyed by the artist who owns it.
  *
- * The protocol names ONE manifest per domain, which fits a site that belongs
- * to one artist and does not fit a label. This site has two artists and two
- * manifests, and on 12 November 2026 only this one exists: Viz has published
- * nothing through Site Manager. Naming it here rather than picking "the
- * first artist with a manifest" keeps the choice visible, because the day Viz
- * publishes, their releases will NOT be reachable through the link and this
- * is the line that says why. That is a protocol question, queued in the OM7
- * repo, and not something to paper over here.
+ * An older app reads only `manifestUrl` and ignores `a`, so that one key
+ * stays, and it stays Dionysus Savior's: his list is the one that already
+ * has releases. `manifests` is what a current app uses, so a link can name
+ * Viz without the app guessing which list a release lives on.
  */
-export const OPEN_LINK_ARTIST_HANDLE = "dionysus-savior"
+export const openManifests = (): Record<string, string> =>
+  Object.fromEntries(
+    ARTISTS.flatMap((artist) =>
+      artist.manifestUrl ? [[artist.handle, artist.manifestUrl]] : []
+    )
+  )
 
-export const openLinkManifestUrl = (): string | undefined =>
-  getArtist(OPEN_LINK_ARTIST_HANDLE)?.manifestUrl
+export const legacyOpenManifestUrl = (): string | undefined =>
+  getArtist("dionysus-savior")?.manifestUrl
 
 /**
  * The link for one release, or null when the app could not follow it.
  *
- * A release from any other manifest gets no link. The app would open,
- * read the manifest discovery names, not find the release there, and say
- * "That release is no longer on the site" about a release that plainly is.
+ * The handle has to be the artist whose manifest this release came from.
+ * The app then asks the site for `manifests[handle]` and nowhere else, so a
+ * handle that is not on this roster, or a manifest that is not that
+ * artist's, gets no link rather than a link the app would fail.
  */
 export const openHrefFor = (
   manifestUrl: string | undefined,
-  releaseId: string
-): string | null =>
-  manifestUrl && manifestUrl === openLinkManifestUrl()
-    ? openInOm7Href(SITE_DOMAIN, releaseId)
-    : null
+  releaseId: string,
+  handle: string
+): string | null => {
+  if (!manifestUrl || openManifests()[handle] !== manifestUrl) return null
+  return openInOm7Href(SITE_DOMAIN, releaseId, handle)
+}

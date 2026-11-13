@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import {
-  OPEN_LINK_ARTIST_HANDLE,
   SITE_DOMAIN,
+  legacyOpenManifestUrl,
   openHrefFor,
   openInOm7Href,
-  openLinkManifestUrl,
+  openManifests,
 } from "../src/lib/open-in-om7.ts"
 import { ARTISTS } from "../src/lib/artists.ts"
 import { SOUND_PRODUCT_IDS, getSoundDownload } from "../src/lib/sounds.ts"
@@ -22,10 +22,11 @@ check("the link is the one the app answers: om7.foundation, /open, d and r", () 
   // OM7OpenLink.isOpenLink and .parse in the app: host om7.foundation, path
   // exactly /open, a plain host in d and a UUID in r. Anything else and iOS
   // either keeps the tap in the browser or the app calls the link malformed.
-  const url = new URL(openInOm7Href(SITE_DOMAIN, RELEASE)!)
+  const url = new URL(openInOm7Href(SITE_DOMAIN, RELEASE, "dionysus-savior")!)
   assert.equal(url.origin, "https://om7.foundation")
   assert.equal(url.pathname, "/open")
-  assert.deepEqual(Array.from(url.searchParams.keys()), ["d", "r"])
+  assert.deepEqual(Array.from(url.searchParams.keys()), ["d", "r", "a"])
+  assert.equal(url.searchParams.get("a"), "dionysus-savior")
   assert.equal(url.searchParams.get("d"), "777records777.studio")
   assert.equal(url.searchParams.get("r"), RELEASE)
 })
@@ -52,26 +53,27 @@ check("it names a domain and a release, never a file", () => {
   }
 })
 
-check("discovery names one manifest, and it is a real artist's own", () => {
-  const named = openLinkManifestUrl()
-  const artist = ARTISTS.find((a) => a.handle === OPEN_LINK_ARTIST_HANDLE)
-  assert.ok(artist, "the artist the open link is filed under is not on the roster")
-  assert.equal(named, artist.manifestUrl)
-  // The app reads this only when it is https. See OM7SiteHTTP.isSecure.
-  assert.equal(new URL(named!).protocol, "https:")
+check("discovery names every roster manifest, and the old key stays one artist's", () => {
+  const manifests = openManifests()
+  for (const artist of ARTISTS) {
+    if (!artist.manifestUrl) continue
+    assert.equal(manifests[artist.handle], artist.manifestUrl)
+    assert.equal(new URL(artist.manifestUrl).protocol, "https:")
+  }
+  assert.equal(legacyOpenManifestUrl(), manifests["dionysus-savior"])
+  assert.equal(manifests["viz"], ARTISTS.find((a) => a.handle === "viz")?.manifestUrl)
 })
 
-check("a release from another manifest gets no link", () => {
-  assert.ok(openHrefFor(openLinkManifestUrl(), RELEASE))
-  assert.equal(openHrefFor(undefined, RELEASE), null)
-  for (const artist of ARTISTS) {
-    if (artist.handle === OPEN_LINK_ARTIST_HANDLE || !artist.manifestUrl) continue
-    assert.equal(
-      openHrefFor(artist.manifestUrl, RELEASE),
-      null,
-      `${artist.handle} would be offered a link the app cannot follow`
-    )
-  }
+check("the link names the artist whose manifest the release came from", () => {
+  const dion = ARTISTS.find((a) => a.handle === "dionysus-savior")!
+  const viz = ARTISTS.find((a) => a.handle === "viz")!
+  const dionLink = new URL(openHrefFor(dion.manifestUrl, RELEASE, dion.handle)!)
+  const vizLink = new URL(openHrefFor(viz.manifestUrl, RELEASE, viz.handle)!)
+  assert.equal(dionLink.searchParams.get("a"), "dionysus-savior")
+  assert.equal(vizLink.searchParams.get("a"), "viz")
+  assert.equal(openHrefFor(undefined, RELEASE, dion.handle), null)
+  assert.equal(openHrefFor(viz.manifestUrl, RELEASE, dion.handle), null)
+  assert.equal(openHrefFor(dion.manifestUrl, RELEASE, "not-on-the-roster"), null)
 })
 
 check("the discovery document carries the manifest", () => {
@@ -81,8 +83,10 @@ check("the discovery document carries the manifest", () => {
     new URL("../src/app/.well-known/om7-site-manager.json/route.ts", import.meta.url),
     "utf8"
   )
-  assert.match(route, /const manifestUrl = openLinkManifestUrl\(\)/)
+  assert.match(route, /const manifestUrl = legacyOpenManifestUrl\(\)/)
+  assert.match(route, /const manifests = openManifests\(\)/)
   assert.match(route, /\.\.\.\(manifestUrl \? \{ manifestUrl \} : \{\}\)/)
+  assert.match(route, /\.\.\.\(Object\.keys\(manifests\)\.length \? \{ manifests \} : \{\}\)/)
 })
 
 check("every catalogue song has a bundle, and it is a .om7", () => {

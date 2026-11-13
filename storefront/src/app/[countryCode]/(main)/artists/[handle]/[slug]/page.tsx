@@ -147,7 +147,7 @@ export default async function ReleasePage(props: Props) {
           <ManifestRelease
             release={found.release}
             items={found.items}
-            openHref={openHrefFor(artist.manifestUrl, found.release.id)}
+            openHref={openHrefFor(artist.manifestUrl, found.release.id, artist.handle)}
           />
         </div>
 

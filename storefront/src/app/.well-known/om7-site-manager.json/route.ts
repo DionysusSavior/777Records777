@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveSiteManagerEndpoint } from "@lib/site-manager-discovery"
-import { openLinkManifestUrl } from "@lib/open-in-om7"
+import { legacyOpenManifestUrl, openManifests } from "@lib/open-in-om7"
 
 export const dynamic = "force-dynamic"
 
@@ -77,7 +77,8 @@ export async function GET(request: Request) {
   const credentialUrl = process.env.OM7_SITE_MANAGER_CREDENTIAL_URL?.trim()
     || `${siteOrigin}/admin`
 
-  const manifestUrl = openLinkManifestUrl()
+  const manifestUrl = legacyOpenManifestUrl()
+  const manifests = openManifests()
 
   return NextResponse.json({
     protocol: "om7.site-manager",
@@ -108,10 +109,13 @@ export async function GET(request: Request) {
      * to OM7Player yet" - which it said for every link until this was added.
      *
      * Optional in the protocol and additive to v1, the way credentialUrl was.
-     * One manifest, on a site with two artists: see openLinkManifestUrl for
-     * which, and why that is stated and not derived.
+     * `manifestUrl` is the one an older app reads, and it is Dionysus
+     * Savior's list. `manifests` names each artist's own list. A current
+     * app uses the handle on the link to pick from it, and does not try
+     * them in turn.
      */
     ...(manifestUrl ? { manifestUrl } : {}),
+    ...(Object.keys(manifests).length ? { manifests } : {}),
   }, {
     headers: {
       "cache-control": "public, max-age=300",

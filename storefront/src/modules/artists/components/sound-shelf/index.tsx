@@ -40,10 +40,13 @@ export default async function SoundShelf({
   countryCode,
   productIds,
   manifestUrl,
+  artistHandle,
 }: {
   countryCode: string
   productIds: string[]
   manifestUrl?: string
+  /** Whose list these releases belong to. The open link names them by it. */
+  artistHandle: string
 }) {
   /**
    * A shelf that cannot reach the backend says "Coming soon", it does not
@@ -98,7 +101,7 @@ export default async function SoundShelf({
             key={`site-manager-release-${entry.release.id}`}
             release={entry.release}
             items={entry.items}
-            openHref={openHrefFor(manifestUrl, entry.release.id)}
+            openHref={openHrefFor(manifestUrl, entry.release.id, artistHandle)}
           />
         ) : (
           <ManifestSound key={`site-manager-${entry.item.id}`} item={entry.item} />

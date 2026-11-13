@@ -106,6 +106,7 @@ export default async function ArtistPage(props: Props) {
           countryCode={countryCode}
           productIds={artist.soundIds}
           manifestUrl={artist.manifestUrl}
+          artistHandle={artist.handle}
         />
       </Section>
 
