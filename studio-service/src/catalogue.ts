@@ -102,11 +102,13 @@ const kindFor = (published: PublishedObject): ManifestItem["kind"] => {
 /**
  * Add one published object without dropping what is already there.
  *
- * A Sounds publish against a manifest that has no `releases` array does not
- * invent one. Inventing it would hide every older file, because the website
- * treats a present array as the whole catalogue. A Movies publish writes
- * `movies` and does not add a Sounds row: a loose video is how a film used
- * to show up on the wrong shelf.
+ * A Sounds publish against a manifest that already exists and has no
+ * `releases` array does not invent one. Inventing it would hide every older
+ * file, because the website treats a present array as the whole catalogue.
+ * A brand new document has no older files, so it starts with an empty
+ * `releases` array and the first file becomes a release. A Movies publish
+ * writes `movies` and does not add a Sounds row: a loose video is how a
+ * film used to show up on the wrong shelf.
  */
 export const applyCatalogue = (raw: string | null, published: PublishedObject, publishedAt: string) => {
   let source: Record<string, unknown>
@@ -116,6 +118,7 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
       version: VERSION,
       updatedAt: publishedAt,
       items: [],
+      releases: [],
     }
   } else {
     let parsed: unknown

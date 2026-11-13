@@ -61,6 +61,7 @@ const MANIFEST_STREAMS: Record<string, string> = {
   "8db3c249-35c0-484e-b6c4-de2faf60a076": `${STREAMS}/in-time.m4a`, // In Time
   "3c4641c8-51c2-45a7-b073-13dc51489a44": `${STREAMS}/gone-crazy.m4a`, // Gone Crazy
   "17495401-61fe-422c-8df9-c727fe448fbf": `${STREAMS}/new-deal.m4a`, // New Deal
+  "755c5d31-860d-48fd-959c-083925505ee1": `${STREAMS}/goddess-of-love.m4a`, // Goddess of Love
 }
 
 export const getManifestStreamUrl = (audioItemId: string): string | undefined =>

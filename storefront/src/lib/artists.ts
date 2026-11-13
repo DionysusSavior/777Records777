@@ -118,7 +118,8 @@ export const ARTISTS: Artist[] = [
     manifestUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json",
     soundIds: [
-      "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
+      // Goddess of Love is a release in the manifest above. The product
+      // would put it on this shelf a second time.
       "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
     ],
     uniformIds: LABEL_UNIFORMS,

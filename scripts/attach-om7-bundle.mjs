@@ -133,8 +133,11 @@ const store = {
 
 const manifest = manifestLocationFor(destination);
 const current = await store.read(manifest.key);
-if (!current) { console.error('no manifest at', manifest.key); process.exit(1); }
-const before = JSON.parse(current.body);
+if (!current && kind !== 'audio') {
+  console.error('no manifest yet. Publish the audio first, so the release is named after the song.');
+  process.exit(1);
+}
+const before = current ? JSON.parse(current.body) : { releases: [] };
 const release = (before.releases ?? []).find((item) => item.id === releaseId);
 if (!release && kind !== 'audio') {
   console.error('that release is not in the manifest. Publish the audio first, so the release is named after the song.');
@@ -142,14 +145,14 @@ if (!release && kind !== 'audio') {
 }
 
 const publishedAt = new Date().toISOString();
-const preview = applyCatalogue(current.body, published, publishedAt);
+const preview = applyCatalogue(current?.body ?? null, published, publishedAt);
 const readable = parseSiteManagerManifest(preview.body, manifest.url, 'store');
 const after = JSON.parse(preview.body);
 console.log('kind         ', kind, release ? `(release was ${release.title})` : '(new release)');
 console.log('object       ', `s3://${destination.bucket}/${key}`, published.contentLength, 'bytes');
 console.log('from         ', file ? file : `s3://${destination.bucket}/${sourceKey}`);
 console.log('download     ', downloadName);
-console.log('manifest     ', manifest.url, 'etag', current.etag);
+console.log('manifest     ', manifest.url, 'etag', current?.etag ?? '(new)');
 console.log('unchanged    ', preview.unchanged, '| site parser reads the result:', Boolean(readable));
 console.log('release after', JSON.stringify(after.releases.find((item) => item.id === releaseId)));
 if (!readable) { console.error('refusing: the site would not read the result'); process.exit(1); }

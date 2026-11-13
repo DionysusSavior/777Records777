@@ -224,7 +224,9 @@ test("Viz can publish Sounds and Movies, and cannot use Dion's destination or re
   const catalogue = JSON.parse(rig.catalogue.snapshot("site-manager/viz/index.json") ?? "{}")
   assert.equal(catalogue.items.length, 1)
   assert.equal(catalogue.items[0].title, "In Time")
-  assert.equal(catalogue.releases, undefined)
+  assert.equal(catalogue.releases.length, 1)
+  assert.equal(catalogue.releases[0].title, "In Time")
+  assert.equal(catalogue.releases[0].audio, catalogue.items[0].id)
 
   await assert.rejects(
     () => rig.service.begin(`Bearer ${soundGrant.token}`, audio("dionysus-savior-sounds")),
@@ -247,7 +249,7 @@ test("Viz can publish Sounds and Movies, and cannot use Dion's destination or re
   assert.equal(after.items.length, 1)
   assert.equal(after.movies.length, 1)
   assert.equal(after.movies[0].title, "Time Machine")
-  assert.equal(after.releases, undefined)
+  assert.equal(after.releases.length, 1)
 })
 
 test("a second completion keeps the first release", async () => {
@@ -920,21 +922,16 @@ test("what the service writes, the website accepts - bundle included", () => {
 
 test("the page list names the commerce releases too, and refuses to remove one", () => {
   /*
-   The phone's list read the manifest and nothing else, so a page carrying
-   three songs reported one. Dion saw In Time alone where Gone Crazy and New
-   Deal also stand, which reads as files having been lost rather than as a
-   list being partial.
-
-   Those two are commerce products. This service has no authority over them -
-   its S3 grant is its own prefix - so they are named and marked, and the
-   removal path still refuses them by key rather than by trusting the flag.
+   Gone Crazy, New Deal on Dion's page, and Goddess of Love are releases
+   now. New Deal is still a commerce product on Viz's page. The service has
+   no authority over it, so it is named and the removal path refuses it.
   */
-  const destination = destinationById("dionysus-savior-sounds")
+  const destination = destinationById("viz-sounds")
   assert.ok(destination)
   const store = storeItemsFor(destination)
-  assert.deepEqual(store.map((item) => item.title), ["Gone Crazy", "New Deal"])
+  assert.deepEqual(store.map((item) => item.title), ["New Deal"])
 
-  const published = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/22222222-2222-4222-8222-222222222222.wav"
+  const published = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/22222222-2222-4222-8222-222222222222.wav"
   const raw = JSON.stringify({
     protocol: "om7.site-manager.manifest",
     version: 1,
@@ -952,7 +949,6 @@ test("the page list names the commerce releases too, and refuses to remove one",
   const entries = pageCatalogue(raw, "sounds", store, "the admin portal")
   assert.deepEqual(entries.map((entry) => [entry.title, entry.removable]), [
     ["DIONYSUS SAVIOR - IN TIME", true],
-    ["Gone Crazy", false],
     ["New Deal", false],
   ])
   assert.equal(entries[1]?.managedBy, "the admin portal")
@@ -965,7 +961,37 @@ test("the page list names the commerce releases too, and refuses to remove one",
 
   // A declared item already in the manifest is one row, not two.
   const twice = pageCatalogue(raw, "sounds", [...store, { id: "x", title: "In Time again", url: published }], "the admin portal")
-  assert.equal(twice.length, 3)
+  assert.equal(twice.length, 2)
+})
+
+test("a first publish starts a release, and an old list without one stays a list", () => {
+  const audio = {
+    key: "site-manager/viz/33333333-3333-4333-8333-333333333333.wav",
+    publicUrl: "https://example.test/song.wav",
+    mediaKind: "audio" as const,
+    contentType: "audio/wav",
+    contentLength: 1,
+    checksumSha256: checksum,
+    downloadName: "song.wav",
+    title: "Goddess of Love",
+    destinationId: "viz-sounds" as const,
+    section: "sounds" as const,
+    releaseId: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+  }
+  const created = JSON.parse(applyCatalogue(null, audio, "2026-11-13T00:00:00.000Z").body)
+  assert.equal(created.releases.length, 1)
+  assert.equal(created.releases[0].title, "Goddess of Love")
+  assert.equal(created.releases[0].audio, "33333333-3333-4333-8333-333333333333")
+  assert.ok(parseSiteManagerManifest(JSON.stringify(created), "https://example.test/index.json", "store"))
+
+  const older = JSON.stringify({
+    protocol: "om7.site-manager.manifest",
+    version: 1,
+    items: [],
+  })
+  const kept = JSON.parse(applyCatalogue(older, audio, "2026-11-13T00:00:00.000Z").body)
+  assert.equal(kept.releases, undefined)
+  assert.equal(kept.items.length, 1)
 })
 
 test("a reel joins its audio when both carry the same release id", () => {
