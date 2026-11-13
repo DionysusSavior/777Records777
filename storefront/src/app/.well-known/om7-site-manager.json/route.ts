@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveSiteManagerEndpoint } from "@lib/site-manager-discovery"
+import { openLinkManifestUrl } from "@lib/open-in-om7"
 
 export const dynamic = "force-dynamic"
 
@@ -76,6 +77,8 @@ export async function GET(request: Request) {
   const credentialUrl = process.env.OM7_SITE_MANAGER_CREDENTIAL_URL?.trim()
     || `${siteOrigin}/admin`
 
+  const manifestUrl = openLinkManifestUrl()
+
   return NextResponse.json({
     protocol: "om7.site-manager",
     version: 1,
@@ -98,6 +101,17 @@ export async function GET(request: Request) {
     connection: "om7-studio",
     transport: "direct-put",
     ...(credentialUrl ? { credentialUrl } : {}),
+    /**
+     * Where this site's releases are listed, for a link that opens one in
+     * OM7Player. Without it the app reaches this document, finds no manifest
+     * named, and tells the listener the site "is not set up to hand releases
+     * to OM7Player yet" - which it said for every link until this was added.
+     *
+     * Optional in the protocol and additive to v1, the way credentialUrl was.
+     * One manifest, on a site with two artists: see openLinkManifestUrl for
+     * which, and why that is stated and not derived.
+     */
+    ...(manifestUrl ? { manifestUrl } : {}),
   }, {
     headers: {
       "cache-control": "public, max-age=300",

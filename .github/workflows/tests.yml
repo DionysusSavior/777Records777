@@ -151,3 +151,5 @@ jobs:
       # alone has to answer for both.
       - run: node storefront/scripts/test-site-manager-manifest.ts
       - run: node storefront/scripts/test-release-slug.ts
+      - run: node storefront/scripts/test-site-manager-discovery.ts
+      - run: node storefront/scripts/test-open-in-om7.ts

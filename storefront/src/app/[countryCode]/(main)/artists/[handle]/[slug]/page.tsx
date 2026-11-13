@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 
 import { ManifestRelease } from "@modules/artists/components/sound-shelf"
+import { openHrefFor } from "@lib/open-in-om7"
 import { SoundPlayerProvider } from "@modules/artists/components/sound-player/context"
 import { getArtist, type Artist } from "@lib/artists"
 import { releaseSlugs } from "@lib/release-slug"
@@ -143,7 +144,11 @@ export default async function ReleasePage(props: Props) {
         </Link>
 
         <div className="mt-8 max-w-sm">
-          <ManifestRelease release={found.release} items={found.items} />
+          <ManifestRelease
+            release={found.release}
+            items={found.items}
+            openHref={openHrefFor(artist.manifestUrl, found.release.id)}
+          />
         </div>
 
         <p className="mt-10 max-w-2xl text-sm leading-relaxed text-white/50">

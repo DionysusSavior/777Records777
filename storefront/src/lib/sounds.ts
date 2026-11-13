@@ -31,7 +31,10 @@ const SOUND_DOWNLOADS: Record<string, SoundDownload> = {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess+of+Love+(feat.+Kap+G).wav",
     label: "Download Goddess Of Love",
     streamUrl: `${STREAMS}/goddess-of-love.m4a`,
-    om7PlayerUrl: "",
+    // The song on its own. Its reel is a 30 MB sideways .mov, over the 16 MB
+    // a bundle takes and needing a re-cut that is Viz's to approve.
+    om7PlayerUrl:
+      "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Goddess%20of%20Love.om7",
   },
   prod_01KJAM74E83E3PEHKTZNSDEGRV: {
     url: "https://777records777productpageassets.s3.us-east-2.amazonaws.com/Going%20Crazy.wav",

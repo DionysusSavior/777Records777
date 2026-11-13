@@ -10,6 +10,8 @@ import {
   type SiteManagerManifestItem,
   type SiteManagerManifestRelease,
 } from "@lib/site-manager-manifest"
+import { openHrefFor } from "@lib/open-in-om7"
+import OpenInOm7 from "@modules/artists/components/open-in-om7"
 import ScrollRail from "@modules/common/components/scroll-rail"
 import Thumbnail from "@modules/products/components/thumbnail"
 import {
@@ -96,6 +98,7 @@ export default async function SoundShelf({
             key={`site-manager-release-${entry.release.id}`}
             release={entry.release}
             items={entry.items}
+            openHref={openHrefFor(manifestUrl, entry.release.id)}
           />
         ) : (
           <ManifestSound key={`site-manager-${entry.item.id}`} item={entry.item} />
@@ -158,10 +161,65 @@ export default async function SoundShelf({
                 </a>
               )}
             </div>
+
+            {/* A catalogue song's bundle used to be linked from its product
+                page only, and this shelf has no link to that page, so the
+                bundle existed and nobody could reach it. */}
+            {download?.om7PlayerUrl && (
+              <SecondLine>
+                <BundlePill href={download.om7PlayerUrl} title={product.title} />
+              </SecondLine>
+            )}
           </div>
         )
       })}
     </ScrollRail>
+  )
+}
+
+/**
+ * The line under the title row: the ways into OM7Player.
+ *
+ * A line of its own because they do not fit beside the title. A panel on a
+ * phone is 255px wide. The first release to carry a bundle put Download and
+ * Release bundle on one row, 379px of it, and the second pill ran out of the
+ * panel and across the next one with the title squeezed to nothing. Nobody
+ * had seen it, because until 12 November 2026 no release had a bundle.
+ *
+ * It wraps, so a third pill costs a line and not an overflow. `empty:hidden`
+ * because the open link draws nothing until it is switched on, and an empty
+ * line would still take its margin.
+ */
+function SecondLine({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 empty:hidden">
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The `.om7`: the song, its reel and the way back here, in one file.
+ *
+ * Labelled for what it is. A tap goes through the browser's own download, so
+ * this is a file to open in OM7Player and not a way into it; the way in is
+ * the open link beside it.
+ */
+function BundlePill({ href, title }: { href: string; title: string }) {
+  return (
+    <a
+      href={href}
+      download
+      aria-label={`Download the OM7 release bundle for ${title}`}
+      className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+        <path d="M3 8v8l9 5 9-5V8" />
+        <path d="M12 13v8" />
+      </svg>
+      Release bundle
+    </a>
   )
 }
 
@@ -185,9 +243,16 @@ function itemById(
 export function ManifestRelease({
   release,
   items,
+  openHref,
 }: {
   release: SiteManagerManifestRelease
   items: SiteManagerManifestItem[]
+  /**
+   * The link that opens this release in OM7Player, when there is one. The
+   * caller decides, because only the caller knows which manifest this came
+   * from. See openHrefFor.
+   */
+  openHref?: string | null
 }) {
   const audio = itemById(items, release.audio)
   const reel = itemById(items, release.reel)
@@ -211,13 +276,13 @@ export function ManifestRelease({
    release for the same reason the download is: a free copy of the thing
    beside its own Buy button.
 
-   Labelled for what it is and not for what it does. Calling it "Open in
-   OM7Player" would be a promise this page cannot keep - a tap still goes
+   Labelled for what it is and not for what it does. Calling THIS link
+   "Open in OM7Player" would be a promise it cannot keep - a tap still goes
    through the browser's own download, and on iOS that lands in the
-   browser's container whatever the file is. Reaching the app from there is
-   the share sheet, or the universal link. Same wording as the artist-site
-   template in the OM7 repo, deliberately: the two pages read the same
-   manifest and should not disagree about the same release.
+   browser's container whatever the file is. The link that does keep that
+   promise is the universal link, drawn beside it as OpenInOm7. Same wording
+   as the artist-site template in the OM7 repo, deliberately: the two pages
+   read the same manifest and should not disagree about the same release.
   */
   const bundleDownload = free && bundle && bundle !== download ? bundle : null
   const buyLabel =
@@ -272,22 +337,6 @@ export function ManifestRelease({
           </a>
         )}
 
-        {bundleDownload && (
-          <a
-            href={bundleDownload.url}
-            download
-            aria-label={`Download the OM7 release bundle for ${release.title}`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-              <path d="M3 8v8l9 5 9-5V8" />
-              <path d="M12 13v8" />
-            </svg>
-            Release bundle
-          </a>
-        )}
-
         {/* External, never `download` - this leaves the site for the
             artist's own Stripe Payment Link. OM7/777 never sees the money. */}
         {buyLabel && (
@@ -306,6 +355,16 @@ export function ManifestRelease({
           </a>
         )}
       </div>
+
+      {/* Withheld on a priced release for the reason the download is. The
+          app fetches whatever the manifest names and does not ask what it
+          costs, so this link beside a Buy button would be the free copy. */}
+      <SecondLine>
+        {free && openHref && <OpenInOm7 href={openHref} title={release.title} />}
+        {bundleDownload && (
+          <BundlePill href={bundleDownload.url} title={release.title} />
+        )}
+      </SecondLine>
     </div>
   )
 }
