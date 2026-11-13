@@ -81,12 +81,10 @@ const LABEL_UNIFORMS = [
   "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
 ]
 
-// Credited to the label rather than to either artist, so it sits on both
-// shelves. Filing it under one of them would be a guess, and leaving it off
-// both would hide the release entirely.
-const LABEL_SOUNDS = [
-  "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
-]
+// New Deal was credited to the label and sat on both shelves. It is a release
+// on Dionysus Savior's manifest now. The product stays on Viz's shelf, because
+// taking it off would hide the song there, and leaving it on his shelf as
+// well would show the same song twice.
 
 // Both director's cuts belong on both artists' pages, using the same files.
 const NEW_DEAL_MOVIES: Movie[] = [
@@ -121,7 +119,7 @@ export const ARTISTS: Artist[] = [
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json",
     soundIds: [
       "prod_01KG8CPWZ9T008217JZYTM3EKW", // VIZ - GODDESS OF LOVE (feat. Kap G)
-      ...LABEL_SOUNDS,
+      "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
     ],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
@@ -156,11 +154,9 @@ export const ARTISTS: Artist[] = [
     bookingEmail: "dionysussavior@outlook.com",
     manifestUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/index.json",
-    // Credits taken from the product titles in Medusa, not guessed.
-    soundIds: [
-      "prod_01KJAM74E83E3PEHKTZNSDEGRV", // DIONYSUS SAVIOR - GONE CRAZY
-      ...LABEL_SOUNDS,
-    ],
+    // Gone Crazy and New Deal are releases in the manifest above. A product
+    // id here would put each song on this shelf a second time.
+    soundIds: [],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
     movies: [
