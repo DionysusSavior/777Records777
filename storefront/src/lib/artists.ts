@@ -81,10 +81,9 @@ const LABEL_UNIFORMS = [
   "prod_01KFCQJC3979EP6BPWJ089TE4Z", // Black BAMN tee
 ]
 
-// New Deal was credited to the label and sat on both shelves. It is a release
-// on Dionysus Savior's manifest now. The product stays on Viz's shelf, because
-// taking it off would hide the song there, and leaving it on his shelf as
-// well would show the same song twice.
+// New Deal is a release on Dionysus Savior's manifest and credits Viz via
+// artistHandles. The product id is gone from both shelves so the song is not
+// listed twice.
 
 // Both director's cuts belong on both artists' pages, using the same files.
 const NEW_DEAL_MOVIES: Movie[] = [
@@ -117,11 +116,10 @@ export const ARTISTS: Artist[] = [
     bookingEmail: "vizisreal@gmail.com",
     manifestUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json",
-    soundIds: [
-      // Goddess of Love is a release in the manifest above. The product
-      // would put it on this shelf a second time.
-      "prod_01KQAK7DCK4SFVFGHXSYPHXBB1", // 777RECORDS777 - NEW DEAL
-    ],
+    // Goddess of Love is a release in the manifest above. New Deal credits
+    // Viz from Dionysus Savior's manifest (artistHandles), so neither song
+    // needs a product id here.
+    soundIds: [],
     uniformIds: LABEL_UNIFORMS,
     amuletIds: [],
     movies: [
