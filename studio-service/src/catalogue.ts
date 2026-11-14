@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { PublishedObject } from "../../backend/src/site-manager/core.ts"
+import { ARTISTS } from "../../storefront/src/lib/artists.ts"
 import { parseSiteManagerManifest, shelfEntriesFrom } from "../../storefront/src/lib/site-manager-manifest.ts"
 import { releaseSlugs } from "../../storefront/src/lib/release-slug.ts"
 
@@ -90,6 +91,32 @@ const bundleItemId = (releaseId: string) => {
   digest[8] = (digest[8] & 0x3f) | 0x80
   const hex = digest.subarray(0, 16).toString("hex")
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
+}
+
+/**
+ * Match credited display names to roster handles.
+ *
+ * The shop shows a release on every page named in `artistHandles`, and it
+ * never compares names itself. Applying a credit at once, with no approval
+ * step, is safe today only because an admin issues every publishing grant -
+ * the day a site has artists who do not know each other, a credit becomes a
+ * way onto somebody else's page and this match needs a gate.
+ */
+const normalizeArtistName = (value: string) =>
+  value.trim().toLowerCase().replace(/\s+/g, " ")
+
+export const artistHandlesFor = (artists: string[] | undefined): string[] | undefined => {
+  if (!artists?.length) return undefined
+  const handles: string[] = []
+  const seen = new Set<string>()
+  for (const name of artists) {
+    const want = normalizeArtistName(name)
+    const match = ARTISTS.find((artist) => normalizeArtistName(artist.name) === want)
+    if (!match || seen.has(match.handle)) continue
+    seen.add(match.handle)
+    handles.push(match.handle)
+  }
+  return handles.length ? handles : undefined
 }
 
 const kindFor = (published: PublishedObject): ManifestItem["kind"] => {
@@ -241,6 +268,8 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
     // key of type `string | null`. Stated rather than cast: a cast would
     // have silenced the one check that would notice if that sentinel ever
     // stopped being set.
+    const credits = published.artists
+    const creditedHandles = artistHandlesFor(credits)
     if (role !== null && existing >= 0) {
       const release = source.releases[existing] as Record<string, unknown>
       source.releases = source.releases.map((r, at) => at !== existing ? r : {
@@ -254,6 +283,9 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
         // longer part of this release.
         [role]: item.id,
         publishedAt,
+        // Credits arrive on every part of the release. Later parts refresh
+        // them so adding a name mid-release still lands on the page.
+        ...(credits ? { artists: credits, artistHandles: creditedHandles ?? null } : {}),
       })
     } else if (role !== null) {
       source.releases = [
@@ -269,6 +301,7 @@ export const applyCatalogue = (raw: string | null, published: PublishedObject, p
           buyUrl: null,
           visible: true,
           publishedAt,
+          ...(credits ? { artists: credits, artistHandles: creditedHandles ?? null } : {}),
         },
       ]
     }

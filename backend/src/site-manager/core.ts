@@ -36,6 +36,30 @@ export const downloadNameFor = (raw: unknown, extension: string): string => {
   return cleaned.toLowerCase().endsWith(`.${extension}`) ? cleaned : `${cleaned}.${extension}`
 }
 
+const MAX_ARTISTS = 8
+const MAX_ARTIST_NAME = 80
+
+/** undefined = absent (ok). null = present but malformed. */
+export const parseArtists = (raw: unknown): string[] | undefined | null => {
+  if (raw === undefined || raw === null) return undefined
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_ARTISTS) return null
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (const entry of raw) {
+    if (typeof entry !== "string") return null
+    const name = entry.trim()
+    if (!name || name.length > MAX_ARTIST_NAME) return null
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    names.push(name)
+  }
+  return names.length ? names : null
+}
+
+export const artistsShapeOk = (value: unknown): value is string[] =>
+  Array.isArray(parseArtists(value))
+
 export type PublishSection = "sounds" | "movies"
 
 export type BeginUploadInput = {
@@ -56,6 +80,8 @@ export type BeginUploadInput = {
    * and therefore `unknown`; omitting it is what broke the build.
    */
   releaseId?: unknown
+  /** Credited display names. Validated in begin and pinned into the receipt. */
+  artists?: unknown
   section?: unknown
   title?: unknown
 }
@@ -127,6 +153,8 @@ export type PublishedObject = {
    * a reel and its audio stop arriving as two unrelated songs.
    */
   releaseId?: string
+  /** Credited display names, when the phone sent them with the upload. */
+  artists?: string[]
 }
 
 export type SiteManagerConfig = {
@@ -176,6 +204,7 @@ type Receipt = {
    * the upload was authorised.
    */
   releaseId?: string
+  artists?: string[]
 }
 
 /**
@@ -359,7 +388,8 @@ const decodeReceipt = (value: unknown, secret: string): Receipt => {
       (receipt.section === "sounds" || receipt.section === "movies") &&
       typeof receipt.title === "string" &&
       (receipt.releaseId === undefined ||
-        (typeof receipt.releaseId === "string" && UUID.test(receipt.releaseId)))
+        (typeof receipt.releaseId === "string" && UUID.test(receipt.releaseId))) &&
+      (receipt.artists === undefined || artistsShapeOk(receipt.artists))
     )
     if (!baseOk || !grantOk) {
       throw new Error("bad shape")
@@ -453,6 +483,7 @@ const completeReceipt = async (
         destinationId: scope.destinationId,
         section: scope.section,
         releaseId: receipt.releaseId,
+        artists: receipt.artists,
       })
       pageUrl = published.pageUrl
     }
@@ -542,6 +573,16 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
       throw new SiteManagerError(400, "invalid_request", "releaseId must be a UUID.")
     }
 
+    /*
+     Optional credits. Same pinning rule as releaseId: carried in the signed
+     receipt so a complete call cannot rewrite who is named on the release.
+     Cap and length match the phone's OM7CreditNames and the site parsers.
+    */
+    const artists = parseArtists(raw.artists)
+    if (artists === null) {
+      throw new SiteManagerError(400, "invalid_request", "artists must be a short list of names.")
+    }
+
     // The client filename is deliberately not used as a storage key. Besides
     // path traversal, same-origin HTML/SVG uploads would turn storage into an
     // executable-content surface. The allowlisted MIME type chooses the suffix.
@@ -589,6 +630,7 @@ export const createSiteManager = (config: SiteManagerConfig, storage: PublishSto
             section: scope.section,
             title,
             ...(releaseId ? { releaseId } : {}),
+            ...(artists ? { artists } : {}),
           }
         : {}),
     }

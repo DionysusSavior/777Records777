@@ -6,6 +6,7 @@ import {
   getManifestStreamUrl,
 } from "@lib/sounds"
 import {
+  getCreditedReleasesFor,
   getSiteManagerShelf,
   type SiteManagerManifestItem,
   type SiteManagerManifestRelease,
@@ -84,14 +85,19 @@ export default async function SoundShelf({
   // These fail independently. A commerce outage cannot hide the artist's
   // direct publishes, and a missing first-publish manifest cannot hide the
   // existing catalogue.
-  const [shelf, products] = await Promise.all([
+  const [shelf, credited, products] = await Promise.all([
     getSiteManagerShelf(manifestUrl),
+    getCreditedReleasesFor(artistHandle),
     productsPromise,
   ])
 
-  if (shelf.length === 0 && products.length === 0) {
+  if (shelf.length === 0 && credited.length === 0 && products.length === 0) {
     return <p className="text-ui-fg-subtle txt-medium">Coming soon.</p>
   }
+
+  const ownReleaseIds = new Set(
+    shelf.flatMap((entry) => (entry.kind === "release" ? [entry.release.id] : []))
+  )
 
   return (
     <ScrollRail>
@@ -107,6 +113,20 @@ export default async function SoundShelf({
           <ManifestSound key={`site-manager-${entry.item.id}`} item={entry.item} />
         )
       )}
+      {credited
+        .filter((entry) => !ownReleaseIds.has(entry.release.id))
+        .map((entry) => (
+          <ManifestRelease
+            key={`credited-release-${entry.release.id}`}
+            release={entry.release}
+            items={entry.items}
+            openHref={openHrefFor(
+              entry.ownerManifestUrl,
+              entry.release.id,
+              entry.ownerHandle
+            )}
+          />
+        ))}
 
       {products.map((product) => {
         const download = getSoundDownload(product)

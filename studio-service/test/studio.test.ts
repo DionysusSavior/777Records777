@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto"
 import { test } from "node:test"
 import { CONTENT_TYPES, canonicalContentType, type PublishStorage, type StoredUpload, type UploadDescriptor } from "../../backend/src/site-manager/core.ts"
-import { applyCatalogue, applySale, commitCatalogue, commitRemoval, commitSale, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
+import { applyCatalogue, applySale, artistHandlesFor, commitCatalogue, commitRemoval, commitSale, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
 import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
 import { destinationById, manifestLocationFor, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
@@ -992,6 +992,47 @@ test("a first publish starts a release, and an old list without one stays a list
   const kept = JSON.parse(applyCatalogue(older, audio, "2026-11-13T00:00:00.000Z").body)
   assert.equal(kept.releases, undefined)
   assert.equal(kept.items.length, 1)
+})
+
+test("credited names match the roster and land as handles on the release", () => {
+  /*
+   The shop shows a release on every page named in artistHandles, and never
+   compares names. Matching here, with no approval step, is safe today only
+   because an admin issues every publishing grant.
+  */
+  assert.deepEqual(artistHandlesFor(["Dionysus Savior", "Viz"]), [
+    "dionysus-savior",
+    "viz",
+  ])
+  assert.equal(artistHandlesFor(["Nobody"]), undefined)
+
+  const body = applyCatalogue(
+    JSON.stringify({
+      protocol: "om7.site-manager.manifest",
+      version: 1,
+      items: [],
+      releases: [],
+    }),
+    {
+      key: "site-manager/dion/dddddddd-4444-4444-8444-dddddddddddd.wav",
+      publicUrl: "https://example.test/dddddddd-4444-4444-8444-dddddddddddd.wav",
+      mediaKind: "audio",
+      contentType: "audio/wav",
+      contentLength: 1,
+      checksumSha256: checksum,
+      downloadName: "song.wav",
+      title: "New Deal",
+      destinationId: "dionysus-savior-sounds",
+      section: "sounds",
+      releaseId: "cccccccc-3333-4333-8333-cccccccccccc",
+      artists: ["Dionysus Savior", "Viz"],
+    },
+    "2026-11-14T00:00:00.000Z"
+  ).body
+  const parsed = JSON.parse(body)
+  assert.deepEqual(parsed.releases[0].artists, ["Dionysus Savior", "Viz"])
+  assert.deepEqual(parsed.releases[0].artistHandles, ["dionysus-savior", "viz"])
+  assert.ok(parseSiteManagerManifest(body, "https://example.test/index.json", "store"))
 })
 
 test("a reel joins its audio when both carry the same release id", () => {

@@ -1,3 +1,5 @@
+import { ARTISTS } from "./artists.ts"
+
 const PROTOCOL = "om7.site-manager.manifest"
 const VERSION = 1
 const MAX_MANIFEST_BYTES = 256 * 1024
@@ -72,6 +74,14 @@ export type SiteManagerManifestRelease = {
   buyUrl: string | null
   visible: boolean
   publishedAt: string
+  /** Credited display names. Optional; absent on older releases. */
+  artists?: string[]
+  /**
+   * Roster handles matched from `artists` by the publishing service.
+   * The shop shows this release on each of those pages and never compares
+   * names itself.
+   */
+  artistHandles?: string[]
 }
 
 export type SiteManagerMovie = {
@@ -269,6 +279,11 @@ const parseRelease = (
   }
   if (attached < 1) return null
 
+  const artists = parseCreditNames(value.artists)
+  if (artists === null) return null
+  const artistHandles = parseCreditHandles(value.artistHandles)
+  if (artistHandles === null) return null
+
   return {
     id: value.id.toLowerCase(),
     title,
@@ -280,7 +295,42 @@ const parseRelease = (
     buyUrl,
     visible: value.visible,
     publishedAt: value.publishedAt,
+    ...(artists ? { artists } : {}),
+    ...(artistHandles ? { artistHandles } : {}),
   }
+}
+
+const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+const MAX_CREDITS = 8
+const MAX_CREDIT_NAME = 80
+
+/** undefined = absent. null = present but bad (refuse the release). */
+const parseCreditNames = (value: unknown): string[] | undefined | null => {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CREDITS) return null
+  const names: string[] = []
+  for (const entry of value) {
+    if (typeof entry !== "string") return null
+    const name = entry.trim()
+    if (!name || name.length > MAX_CREDIT_NAME) return null
+    names.push(name)
+  }
+  return names
+}
+
+const parseCreditHandles = (value: unknown): string[] | undefined | null => {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CREDITS) return null
+  const handles: string[] = []
+  const seen = new Set<string>()
+  for (const entry of value) {
+    if (typeof entry !== "string") return null
+    const handle = entry.trim().toLowerCase()
+    if (!HANDLE.test(handle) || seen.has(handle)) return null
+    seen.add(handle)
+    handles.push(handle)
+  }
+  return handles
 }
 
 /**
@@ -590,4 +640,48 @@ export const getSiteManagerShelf = async (
   const parsed = await readManifest(manifestUrl)
   if (!parsed) return []
   return shelfEntriesFrom(parsed)
+}
+
+/**
+ * A release that lives on another artist's manifest but credits this handle.
+ *
+ * The shop never compares names. It only follows `artistHandles` the service
+ * wrote after matching the credited names to the roster.
+ */
+export type CreditedShelfEntry = {
+  kind: "release"
+  release: SiteManagerManifestRelease
+  items: SiteManagerManifestItem[]
+  /** Whose manifest this release was read from. The open link names them. */
+  ownerHandle: string
+  ownerManifestUrl: string
+}
+
+export const getCreditedReleasesFor = async (
+  handle: string
+): Promise<CreditedShelfEntry[]> => {
+  const want = handle.toLowerCase()
+  const credited: CreditedShelfEntry[] = []
+  const seen = new Set<string>()
+  await Promise.all(
+    ARTISTS.map(async (artist) => {
+      if (!artist.manifestUrl || artist.handle === want) return
+      const parsed = await readManifest(artist.manifestUrl)
+      if (!parsed?.releases) return
+      for (const release of parsed.releases) {
+        if (!release.visible) continue
+        if (!release.artistHandles?.includes(want)) continue
+        if (seen.has(release.id)) continue
+        seen.add(release.id)
+        credited.push({
+          kind: "release",
+          release,
+          items: parsed.items,
+          ownerHandle: artist.handle,
+          ownerManifestUrl: artist.manifestUrl,
+        })
+      }
+    })
+  )
+  return credited
 }
