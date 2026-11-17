@@ -117,11 +117,25 @@ const outDir = flag('--out') ?? '.';
 
 // ---- Reading and checking the files -------------------------------------
 
-/** Extensions AVFoundation opens without argument. Anything else is a warning, not a refusal. */
-const AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.m4a', '.aac', '.aif', '.aiff', '.caf', '.flac', '.alac']);
+/**
+ The song types OM7Player plays, and the only ones this writes.
 
-/** What a phone shows as artwork. */
-const COVER_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.heic']);
+ A COPY of `Track.audioExtensions` in the music-metaverse repo
+ (om7player/OM7Player/OM7Player/Models.swift). Another repo cannot read that
+ file, so the two must be changed together. Since 16 November 2026 the app
+ refuses a bundle whose song is anything else, before it writes a byte,
+ because a bundle whose "song" was another bundle once unpacked itself 300
+ times. So a song of another type is a bundle that fails on every phone, and
+ it is refused here rather than warned about.
+
+ Until 17 November this list was "what AVFoundation opens" and carried .caf,
+ .flac and .alac, which the player has never listed, and lacked .aifc and
+ .mpeg, which it does.
+ */
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.mpeg', '.wav', '.aif', '.aiff', '.aifc', '.m4a', '.aac']);
+
+/** The covers the app keeps. It drops any other kind and the song still arrives. */
+const COVER_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic']);
 
 /** Spotify's Canvas bounds, borrowed by the spec because they are what artists already cut for. */
 const LOOP_MIN_SECONDS = 3;
@@ -174,7 +188,10 @@ if (audio) {
     // that arrives and never appears in the list.
     problems.push(`--audio ${audioPath} has no file extension; the player identifies files by it.`);
   } else if (!AUDIO_EXTENSIONS.has(audioExtension)) {
-    warnings.push(`--audio is ${audioExtension}, which AVFoundation may not open. The bundle is still valid.`);
+    problems.push(
+      `--audio is ${audioExtension}. OM7Player plays ${[...AUDIO_EXTENSIONS].join(' ')} ` +
+        'and refuses a bundle whose song is anything else. Export the master as .wav or .m4a.',
+    );
   }
   if (audio.length > AUDIO_CHATTY_BYTES) {
     warnings.push(
@@ -305,7 +322,10 @@ if (font && font.length > 2 * 1024 * 1024) {
 }
 
 if (cover && !COVER_EXTENSIONS.has(coverExtension)) {
-  warnings.push(`--cover is ${coverExtension || 'extensionless'}, which may not display. The bundle is still valid.`);
+  warnings.push(
+    `--cover is ${coverExtension || 'extensionless'}. OM7Player keeps only ${[...COVER_EXTENSIONS].join(' ')} ` +
+      'and will leave this one out; the song still arrives.',
+  );
 }
 
 if (site !== null) {

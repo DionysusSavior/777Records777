@@ -13,7 +13,7 @@
     "build:backend": "npm --workspace backend run build",
     "build:storefront": "npm --workspace storefront run build",
     "build:admin": "npm --workspace admin run build",
-    "test": "npm --prefix studio-service run test && npm --workspace storefront run test",
+    "test": "npm --prefix studio-service run test && npm --workspace storefront run test && node --test scripts/make-om7-bundle.test.mjs",
     "typecheck": "npm --prefix studio-service run typecheck && npm --workspace storefront run typecheck:studio-admin",
     "test:site-manager-manifest": "npm --workspace storefront run test",
     "preview:admin": "npm --workspace admin run preview",
