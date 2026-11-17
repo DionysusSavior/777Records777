@@ -5,6 +5,7 @@ import { CONTENT_TYPES, canonicalContentType, type PublishStorage, type StoredUp
 import { applyCatalogue, applySale, artistHandlesFor, commitCatalogue, commitRemoval, commitSale, listCatalogue, pageCatalogue, removeFromCatalogue, type ManifestStore } from "../src/catalogue.ts"
 import { storeItemsFor } from "../src/page-items.ts"
 import { parseSiteManagerManifest } from "../../storefront/src/lib/site-manager-manifest.ts"
+import { getSoundDownload } from "../../storefront/src/lib/sounds.ts"
 import { destinationById, manifestLocationFor, objectKeyFor, UPLOAD_TTL_NOTE } from "../src/destinations.ts"
 import { verifyPublishAssertion } from "../src/assertion.ts"
 import { createStudioService, memoryGrantStore } from "../src/grants.ts"
@@ -922,14 +923,26 @@ test("what the service writes, the website accepts - bundle included", () => {
 
 test("the page list names the commerce releases too, and refuses to remove one", () => {
   /*
-   Gone Crazy, New Deal on Dion's page, and Goddess of Love are releases
-   now. New Deal is still a commerce product on Viz's page. The service has
-   no authority over it, so it is named and the removal path refuses it.
+   Every song on both artist pages is a release now: Gone Crazy, New Deal
+   and Goddess of Love. Since 790a7be (14 Nov) New Deal reaches Viz's page
+   through its release's artistHandles rather than as a commerce product,
+   so Viz's real sound shelf is empty, and that is checked first.
+
+   A commerce download on a page is still something this list must name and
+   refuse to remove: the movies section is made of them, and a product goes
+   back on a shelf with one line in artists.ts. The service has no authority
+   over one. So the rest uses New Deal's real product download, built the
+   way storeItemsFor builds an item from a shelf.
   */
   const destination = destinationById("viz-sounds")
   assert.ok(destination)
-  const store = storeItemsFor(destination)
-  assert.deepEqual(store.map((item) => item.title), ["New Deal"])
+  assert.deepEqual(storeItemsFor(destination), [], "Viz's sound shelf holds no commerce product since 790a7be")
+
+  const newDeal = "prod_01KQAK7DCK4SFVFGHXSYPHXBB1"
+  const download = getSoundDownload({ id: newDeal })
+  assert.ok(download, "New Deal's product download is still in sounds.ts")
+  assert.equal(download.label, "Download New Deal")
+  const store = [{ id: newDeal, title: "New Deal", url: download.url }]
 
   const published = "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/22222222-2222-4222-8222-222222222222.wav"
   const raw = JSON.stringify({

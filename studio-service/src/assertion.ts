@@ -46,7 +46,10 @@ export const verifyPublishAssertion = (
   if (typeof payload.sub !== "string" || !/^[\w-]{1,128}$/.test(payload.sub) || typeof payload.host !== "string") {
     throw new Error("The publishing assertion is not valid.")
   }
-  if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)
+  // `typeof` first: Number.isFinite already refuses a missing value, but
+  // TypeScript cannot see that, and the typecheck was red over it.
+  if (typeof payload.iat !== "number" || typeof payload.exp !== "number"
+    || !Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)
     || payload.iat > at + 60 || payload.exp <= at || payload.exp - payload.iat !== TTL_SECONDS) {
     throw new Error("The publishing assertion has expired.")
   }
