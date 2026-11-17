@@ -6,6 +6,10 @@ applications:
         preBuild:
           commands:
             - npm install --include=dev
+            # The repo's tests and typecheck. A red one stops the deploy and
+            # the live site stays as it was. Why, and why it brings its own
+            # Node 22: scripts/ci-test.sh.
+            - bash ../scripts/ci-test.sh
         build:
           commands:
             # Amplify hands console variables to the BUILD, not to the SSR
