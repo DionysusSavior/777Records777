@@ -54,6 +54,7 @@ export default function StudioAdmin({
   const [destinationId, setDestinationId] = useState(destinations[0].id)
   const [email, setEmail] = useState("")
   const [busy, setBusy] = useState(false)
+  const [copiedRoute, setCopiedRoute] = useState<string | null>(null)
   const [copied, setCopied] = useState<{ target: "connection" | "link"; ok: boolean } | null>(null)
   const sections = sectionsFor(config, state)
 
@@ -173,7 +174,7 @@ export default function StudioAdmin({
             {state.connection.replacesOld
               ? `New connection for ${state.connection.label}. The old one stops working.`
               : `Connection for ${state.connection.label}.`}
-            {" "}Paste this into OM7 Player, under Publish. It is shown once.
+            {" "}In OM7 Player, open Publish → Connect an existing website and paste this connection. It is shown once.
           </p>
           <textarea readOnly value={state.connection.value} className="h-32 rounded border border-white/20 bg-black p-3 text-xs" />
           <button
@@ -205,6 +206,16 @@ export default function StudioAdmin({
               <p>{connection.label}{connection.revoked ? " · removed" : ""}</p>
               {connection.reconnectRequired && !connection.revoked && (
                 <p className="text-white/70">This one needs a new connection. The old one no longer works.</p>
+              )}
+              {connection.verifiedConnection && (
+                <details>
+                  <summary>Connect with a verified domain</summary>
+                  <p className="my-2 text-white/70">If you verified this site in your OM7 account, copy this destination into Publish → Connect an existing website. You can use it again on another device.</p>
+                  <textarea aria-label={`Verified destination for ${connection.label}`} readOnly value={connection.verifiedConnection} className="w-full rounded border border-white/20 bg-black p-3 text-xs" />
+                  <button type="button" className={quiet} onClick={() => {
+                    setCopiedRoute(copyText(connection.verifiedConnection!) ? connection.id : null)
+                  }}>{copiedRoute === connection.id ? "Copied" : "Copy destination"}</button>
+                </details>
               )}
               {!connection.revoked && (
                 <button

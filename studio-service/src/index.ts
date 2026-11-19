@@ -63,6 +63,7 @@ const depsFor = (receiptSecret: string): HandlerDeps => {
   const people = createAdminService(dynamoAdminStore(tableName), admins, process.env.STUDIO_INVITE_FROM?.trim() ? sendStudioInvite : undefined)
   return ({
   people,
+  assertionConnections: Boolean(process.env.OM7_PUBLISH_KEYS_URL?.trim() && process.env.STUDIO_PUBLIC_ORIGIN?.trim()),
   service: createStudioService({
     store: tableName ? dynamoGrantStore(tableName) : memoryGrantStore(),
     manifests: s3ManifestStore(DESTINATIONS[0].bucket, DESTINATIONS[0].region),

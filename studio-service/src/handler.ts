@@ -2,11 +2,13 @@ import type { createAdminService } from "./admins.ts"
 import { SiteManagerError, destinationOf } from "../../backend/src/site-manager/core.ts"
 import { CatalogueError } from "./catalogue.ts"
 import { IdentityError, type VerifiedIdentity } from "./identity.ts"
+import { destinationById } from "./destinations.ts"
 import type { StudioService } from "./grants.ts"
 
 const MAX_BODY = 8_192
 
 export type HandlerDeps = {
+  assertionConnections?: boolean
   people?: ReturnType<typeof createAdminService>
   service: StudioService
   allowedOrigins: readonly string[]
@@ -221,7 +223,14 @@ export const handle = async (
       return json(201, { ...accepted, connection: connectionDocument(endpoint, accepted) }, cors)
     }
     if (request.method === "GET" && path === "/me/grants") {
-      return json(200, { grants: await deps.service.listOwn(identity) }, cors)
+      const grants = await deps.service.listOwn(identity)
+      return json(200, { grants: grants.map(grant => {
+        const destination = destinationById(grant.destinationId)
+        if (!deps.assertionConnections || !publicOrigin || grant.revoked || !destination) return grant
+        return { ...grant, verifiedConnection: connectionDocument(publicOrigin, {
+          destination, prefix: destination.prefix, authentication: "om7-assertion",
+        }) }
+      }) }, cors)
     }
     if (request.method === "POST" && path === "/me/grants/rotate") {
       const endpoint = requireOrigin()
@@ -264,11 +273,11 @@ export const handle = async (
 
 export const connectionDocument = (
   endpoint: string,
-  accepted: { token: string; destination: { id: string; artistName: string; siteHost: string; section: string; pageUrl: string }; prefix: string },
+  accepted: ({ token: string } | { authentication: "om7-assertion" }) & { destination: { id: string; artistName: string; siteHost: string; section: string; pageUrl: string }; prefix: string },
 ) => {
   const payload = {
     endpoint: endpoint.endsWith("/") ? endpoint : `${endpoint}/`,
-    token: accepted.token,
+    ...("token" in accepted ? { token: accepted.token } : { authentication: accepted.authentication }),
     destinationId: accepted.destination.id,
     artistName: accepted.destination.artistName,
     siteHost: accepted.destination.siteHost,

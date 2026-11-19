@@ -305,3 +305,24 @@ test("a query parameter survives the Lambda event", async () => {
 })
 
 void (null as KeyObject | null)
+
+test("verified routes contain no bearer, stay account-scoped and disappear on revocation", async () => {
+  const service = deps()
+  service.assertionConnections = true
+  const admin = tokenFor(ADMIN)
+  const viz = tokenFor(VIZ, VIZ_EMAIL)
+  const invited = await call(service, "POST", "/admin/invites", admin, {
+    destinationId: "viz-sounds", recipientEmail: VIZ_EMAIL,
+  })
+  const accepted = await call(service, "POST", "/admin/invites/accept", viz, { inviteId: invited.body.inviteId })
+  const own = await call(service, "GET", "/me/grants", viz)
+  const grants = own.body.grants as Array<{ id: string; verifiedConnection?: string }>
+  const route = JSON.parse(Buffer.from(grants[0].verifiedConnection!.slice("om7-studio:".length), "base64url").toString())
+  assert.equal(route.authentication, "om7-assertion")
+  assert.equal(route.destinationId, "viz-sounds")
+  assert.equal(route.token, undefined)
+  assert.deepEqual((await call(service, "GET", "/me/grants", admin)).body.grants, [])
+  await call(service, "POST", "/admin/grants/revoke", admin, { grantId: accepted.body.grantId })
+  const revoked = (await call(service, "GET", "/me/grants", viz)).body.grants as Array<{ verifiedConnection?: string }>
+  assert.equal(revoked[0].verifiedConnection, undefined)
+})

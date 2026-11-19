@@ -330,7 +330,7 @@ const text = (value: unknown) => (typeof value === "string" && value.length > 0 
 
 export type InviteDetails = { inviteId: string; expiresAt: string; label: string; pageUrl: string | null }
 export type IssuedConnection = { grantId: string; label: string; value: string }
-export type MyConnection = { id: string; label: string; revoked: boolean; reconnectRequired: boolean }
+export type MyConnection = { id: string; label: string; revoked: boolean; reconnectRequired: boolean; verifiedConnection?: string }
 export type AccessEntry = MyConnection & { accountId: string }
 export type CreatedInvite = { inviteId: string; expiresAt: string; label: string; acceptUrl: string; mailed: boolean }
 
@@ -414,7 +414,14 @@ export const studioClient = (serviceUrl: string, token: string, fetchImpl: Fetch
       return issued(await call("/admin/invites/accept", { inviteId }))
     },
     async myConnections() {
-      return list(await call("/me/grants")).map(connectionEntry)
+      return list(await call("/me/grants")).map(raw => {
+        const entry = connectionEntry(raw)
+        if (isRecord(raw) && !entry.revoked && typeof raw.verifiedConnection === "string"
+          && raw.verifiedConnection.startsWith("om7-studio:")) {
+          entry.verifiedConnection = raw.verifiedConnection
+        }
+        return entry
+      })
     },
     async renewMine(grantId: string) {
       return issued(await call("/me/grants/rotate", { grantId }))
