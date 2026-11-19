@@ -335,6 +335,8 @@ export type CatalogueEntry = {
    * caller should fall back to the page the whole destination points at.
    */
   pageUrl?: string
+  downloadUrl?: string
+  audioUrl?: string
 }
 
 /** What a destination needs to state before a release can have an address. */
@@ -432,7 +434,11 @@ export const listCatalogue = (
       const id = textOf(release.id)
       if (!url || !title || !id) return []
       const pageUrl = addresses.get(id)
-      return [pageUrl ? { id, title, url, removable: true, pageUrl } : { id, title, url, removable: true }]
+      const bundle = items.find(item => item.id === release.bundle && item.kind === "bundle")
+      const downloadUrl = bundle ? textOf(bundle.url) : null
+      return [{ id, title, url, removable: true, ...(pageUrl ? { pageUrl } : {}),
+        ...(audioId && release.price == null ? { audioUrl: url } : {}),
+        ...(downloadUrl && release.price == null ? { downloadUrl } : {}) }]
     })
   }
   return items.flatMap((item) => {
