@@ -176,8 +176,8 @@ export default function ProductActions({
   */
   const om7Bundle = soundDownload?.om7PlayerUrl
   const om7PlayerHref =
-    om7Bundle || "https://apps.apple.com/us/app/om7player/id6755060481"
-  const om7PlayerLabel = om7Bundle ? "Open in OM7Player" : "Download OM7Player"
+    "https://apps.apple.com/us/app/om7player/id6755060481"
+  const om7PlayerLabel = "Open in OM7Player"
 
   const shouldPulsePreorder = isPreorder && canBuy && !isAdding
 
@@ -289,20 +289,6 @@ export default function ProductActions({
         )}
         {soundDownload && (
           <div className="flex flex-col gap-6 pt-4">
-            <Button
-              asChild
-              variant="primary"
-              className="w-full h-14 px-8 sound-download-btn heartbeat-glow"
-            >
-              <a
-                href={soundDownload.url}
-                download
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                {soundDownload.label}
-              </a>
-            </Button>
             <Button
               asChild
               variant="secondary"

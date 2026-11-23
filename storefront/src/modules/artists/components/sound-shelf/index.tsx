@@ -143,7 +143,6 @@ export default async function SoundShelf({
               audioUrl: download.streamUrl ?? download.url,
               mediaUrl: product.thumbnail ?? preferred[0]?.url,
               mediaClassName: getArtworkRotationClassName(product),
-              downloadUrl: download.url,
             }
           : null
 
@@ -165,34 +164,13 @@ export default async function SoundShelf({
                 {product.title}
               </span>
 
-              {download && (
-                <a
-                  href={download.url}
-                  download
-                  aria-label={`Download ${product.title}`}
-                  // Beside the title rather than over the artwork: the panel is
-                  // playing, and a button on top of it competes with the thing
-                  // it is meant to be selling.
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M12 3v12" />
-                    <path d="m7 10 5 5 5-5" />
-                    <path d="M5 21h14" />
-                  </svg>
-                  Download
-                </a>
-              )}
+
             </div>
 
             {/* A catalogue song's bundle used to be linked from its product
                 page only, and this shelf has no link to that page, so the
                 bundle existed and nobody could reach it. */}
-            {download?.om7PlayerUrl && (
-              <SecondLine>
-                <BundlePill href={download.om7PlayerUrl} title={product.title} />
-              </SecondLine>
-            )}
+            <SecondLine><OpenInOm7 href="https://apps.apple.com/us/app/om7player/id6755060481" title={product.title} /></SecondLine>
           </div>
         )
       })}
@@ -228,23 +206,6 @@ function SecondLine({ children }: { children: React.ReactNode }) {
  * this is a file to open in OM7Player and not a way into it; the way in is
  * the open link beside it.
  */
-function BundlePill({ href, title }: { href: string; title: string }) {
-  return (
-    <a
-      href={href}
-      download
-      aria-label={`Download the OM7 release bundle for ${title}`}
-      className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-    >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-        <path d="M3 8v8l9 5 9-5V8" />
-        <path d="M12 13v8" />
-      </svg>
-      Release bundle
-    </a>
-  )
-}
 
 function itemById(
   items: SiteManagerManifestItem[],
@@ -284,30 +245,6 @@ export function ManifestRelease({
   // A free download beside a Buy button undercuts the sale it sits next to -
   // the same file, free, one tap away. Priced releases get Buy only.
   const free = release.price == null
-  const download = free ? audio ?? bundle : null
-  /*
-   The bundle BESIDE the loose audio, not instead of it.
-
-   `audio ?? bundle` meant an artist who had built a .om7 had no link to it
-   on this page whenever a loose song also existed - which is the ordinary
-   case, because the audio is published first and the bundle is built from
-   it afterwards. The bundle was only ever reachable for a release that had
-   no loose audio at all.
-
-   Offered only when it is not already the download, so a release with no
-   loose audio does not show the same file twice. Withheld on a priced
-   release for the same reason the download is: a free copy of the thing
-   beside its own Buy button.
-
-   Labelled for what it is and not for what it does. Calling THIS link
-   "Open in OM7Player" would be a promise it cannot keep - a tap still goes
-   through the browser's own download, and on iOS that lands in the
-   browser's container whatever the file is. The link that does keep that
-   promise is the universal link, drawn beside it as OpenInOm7. Same wording
-   as the artist-site template in the OM7 repo, deliberately: the two pages
-   read the same manifest and should not disagree about the same release.
-  */
-  const bundleDownload = free && bundle && bundle !== download ? bundle : null
   const buyLabel =
     release.price != null && release.buyUrl
       ? `Buy — $${(release.price / 100).toFixed(2)}`
@@ -323,7 +260,6 @@ export function ManifestRelease({
         title: release.title,
         audioUrl: getManifestStreamUrl(audio.id) ?? audio.url,
         mediaUrl: images[0]?.url,
-        downloadUrl: download?.url,
       }
     : null
 
@@ -344,21 +280,7 @@ export function ManifestRelease({
           {release.title}
         </span>
 
-        {download && (
-          <a
-            href={download.url}
-            download
-            aria-label={`Download ${release.title}`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M12 3v12" />
-              <path d="m7 10 5 5 5-5" />
-              <path d="M5 21h14" />
-            </svg>
-            Download
-          </a>
-        )}
+
 
         {/* External, never `download` - this leaves the site for the
             artist's own Stripe Payment Link. OM7/777 never sees the money. */}
@@ -384,9 +306,7 @@ export function ManifestRelease({
           costs, so this link beside a Buy button would be the free copy. */}
       <SecondLine>
         {free && openHref && <OpenInOm7 href={openHref} title={release.title} />}
-        {bundleDownload && (
-          <BundlePill href={bundleDownload.url} title={release.title} />
-        )}
+
       </SecondLine>
     </div>
   )
@@ -399,7 +319,6 @@ function ManifestSound({ item }: { item: SiteManagerManifestItem }) {
           id: item.id,
           title: item.title,
           audioUrl: getManifestStreamUrl(item.id) ?? item.url,
-          downloadUrl: item.url,
         }
       : null
 
@@ -420,19 +339,7 @@ function ManifestSound({ item }: { item: SiteManagerManifestItem }) {
           {item.title}
         </span>
 
-        <a
-          href={item.url}
-          download
-          aria-label={`Download ${item.title}`}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-white/90"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M12 3v12" />
-            <path d="m7 10 5 5 5-5" />
-            <path d="M5 21h14" />
-          </svg>
-          Download
-        </a>
+        <OpenInOm7 href="https://apps.apple.com/us/app/om7player/id6755060481" title={item.title} />
       </div>
     </div>
   )

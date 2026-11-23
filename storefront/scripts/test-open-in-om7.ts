@@ -106,8 +106,8 @@ check("the shelf offers a catalogue song's bundle", () => {
     new URL("../src/modules/artists/components/sound-shelf/index.tsx", import.meta.url),
     "utf8"
   )
-  assert.match(shelf, /download\?\.om7PlayerUrl && \(/)
-  assert.match(shelf, /<BundlePill href=\{download\.om7PlayerUrl\}/)
+  assert.doesNotMatch(shelf, /<BundlePill/)
+  assert.match(shelf, /<OpenInOm7/)
 })
 
 console.log(`Open in OM7Player: ${checks} checks passed`)
