@@ -60,6 +60,14 @@ const nextConfig = {
      * src/app/api/variant-availability/route.ts.
      */
     MEDUSA_BACKEND_URL: process.env.MEDUSA_BACKEND_URL,
+    /**
+     * Each artist's booking inbox, by the same rule. Server-only: the sole
+     * reader is src/lib/booking-email.ts, which imports "server-only", so a
+     * client component that reached for it would fail the build rather than
+     * inline someone's inbox into the browser's JavaScript.
+     */
+    BOOKING_EMAIL_VIZ: process.env.BOOKING_EMAIL_VIZ,
+    BOOKING_EMAIL_DIONYSUS_SAVIOR: process.env.BOOKING_EMAIL_DIONYSUS_SAVIOR,
   },
   reactStrictMode: true,
   logging: {

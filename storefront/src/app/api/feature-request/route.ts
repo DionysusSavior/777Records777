@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getArtist } from "@lib/artists"
+import { bookingEmailFor } from "@lib/booking-email"
 
 /**
  * Takes a feature enquiry and hands it to the mail function.
@@ -65,11 +66,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "That did not send. Try again in a moment." }, { status: 503 })
   }
 
+  // Server-only and read from the environment (src/lib/booking-email.ts). A
+  // missing one is a deploy fault, reported here and not guessed around.
+  const to = bookingEmailFor(artist.handle)
+  if (!to) {
+    console.error("feature-request: no booking address is set for", artist.handle)
+    return NextResponse.json({ error: "That did not send. Try again in a moment." }, { status: 503 })
+  }
+
   const res = await fetch(FEATURE_REQUEST_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      to: artist.bookingEmail,
+      to,
       artistName: artist.name,
       name,
       email,

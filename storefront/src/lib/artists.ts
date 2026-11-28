@@ -51,14 +51,9 @@ export type Artist = {
    * so the only thing that can suggest height is light.
    */
   glow: string
-  /**
-   * Where a feature enquiry for this artist lands.
-   *
-   * On the artist rather than in one shared inbox, because a booking is a
-   * conversation with a person and routing it centrally would mean somebody
-   * forwarding mail by hand forever.
-   */
-  bookingEmail: string
+  // Where a feature enquiry for this artist lands is not on the artist: it is
+  // in src/lib/booking-email.ts, server-only, because everything here reaches
+  // the browser (the home page passes whole artists to a client component).
   /**
    * The artist-owned list written by Site Manager direct mode.
    *
@@ -113,7 +108,6 @@ export const ARTISTS: Artist[] = [
     // Cool and dim to match a photograph that is almost entirely shadow. A
     // warm glow here would look pasted on.
     glow: "rgba(148, 163, 184, 0.30)",
-    bookingEmail: "vizisreal@gmail.com",
     manifestUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/viz/index.json",
     // Goddess of Love is a release in the manifest above. New Deal credits
@@ -150,7 +144,6 @@ export const ARTISTS: Artist[] = [
     // taken from the photograph this replaced; left on the new one it read as
     // a colour laid over the panel rather than light spilling out of it.
     glow: "rgba(138, 170, 208, 0.34)",
-    bookingEmail: "dionysussavior@outlook.com",
     manifestUrl:
       "https://777records777productpageassets.s3.us-east-2.amazonaws.com/site-manager/dion/index.json",
     // Gone Crazy and New Deal are releases in the manifest above. A product

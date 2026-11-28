@@ -26,7 +26,8 @@ applications:
             #
             # `|| true` so a missing variable does not fail the build; the
             # route's own guard reports it instead.
-            - env | grep -E '^FEATURE_REQUEST_URL=' >> .env.production || true
+            # The booking inboxes ride the same line (src/lib/booking-email.ts).
+            - env | grep -E '^(FEATURE_REQUEST_URL|BOOKING_EMAIL_[A-Z_]+)=' >> .env.production || true
             - npm run build
       artifacts:
         baseDirectory: .next
